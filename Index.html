@@ -1,0 +1,1261 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Price of Place</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: a printed-deed look. Left = square game board with a roll panel in its centre; right = deed card, district mastery, log. */
+:root{
+  --bg:#e9ede7; --surface:#fafaf6; --surface2:#f0f2ec; --ink:#1b2420; --muted:#56635c; --line:#c9d0c6;
+  --accent:#b1352c; --accent-ink:#ffffff; --good:#1f7a4d; --bad:#b1352c; --gold:#b58a12; --focus:#1c58d0;
+  --board:#d4e3d3; --shadow:0 1px 0 rgba(0,0,0,.06),0 8px 24px rgba(20,35,28,.10);
+  --f-display:'Archivo','Arial Narrow',system-ui,sans-serif;
+  --f-body:'Atkinson Hyperlegible',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101613; --surface:#18211d; --surface2:#1f2a25; --ink:#e8efe9; --muted:#9baba3; --line:#33423b;
+  --accent:#e0675d; --accent-ink:#1b0f0d; --good:#52c28a; --bad:#ec7f76; --gold:#e0b84a; --focus:#7aa2ff;
+  --board:#16241d; --shadow:0 1px 0 rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101613; --surface:#18211d; --surface2:#1f2a25; --ink:#e8efe9; --muted:#9baba3; --line:#33423b;
+  --accent:#e0675d; --accent-ink:#1b0f0d; --good:#52c28a; --bad:#ec7f76; --gold:#e0b84a; --focus:#7aa2ff;
+  --board:#16241d; --shadow:0 1px 0 rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--f-body)}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.app{max-width:1200px;margin:0 auto;padding-inline:16px;padding-block:16px 40px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-bottom:12px;border-bottom:3px double var(--ink)}
+.brand h1{margin:0;font:800 clamp(26px,4.5vw,40px)/1 var(--f-display);letter-spacing:-.01em;text-transform:uppercase}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.hud{display:flex;flex-wrap:wrap;gap:8px}
+.stat{flex:1 1 76px;min-width:0;padding:6px 12px;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.stat b{display:block;font:600 20px/1.2 var(--f-mono);font-variant-numeric:tabular-nums}
+.stat span{white-space:nowrap;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.neg{color:var(--bad)}
+nav.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-block:14px}
+nav.tabs button{padding:8px 16px;border:1px solid var(--line);background:var(--surface);border-radius:6px;font:700 14px var(--f-display);letter-spacing:.04em;text-transform:uppercase}
+nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+section.pane[hidden]{display:none}
+.play{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:960px){.play{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.stat span{font-size:9.5px;letter-spacing:.03em}.stat b{font-size:16px}.hud{width:100%}.stat{padding:5px 8px}}
+/* board */
+.boardwrap{container-type:inline-size;max-width:760px;width:100%;margin-inline:auto}
+.board{display:grid;grid-template:repeat(9,1fr)/repeat(9,1fr);aspect-ratio:1;background:var(--board);border:2px solid var(--ink);box-shadow:var(--shadow)}
+.cell{position:relative;display:flex;flex-direction:column;justify-content:space-between;align-items:stretch;min-width:0;padding:0;margin:0;background:var(--surface);border:1px solid var(--ink);text-align:left;overflow:hidden}
+.cell:hover{background:var(--surface2)}
+.cell .band{height:22%;background:var(--c,transparent);border-bottom:1px solid var(--ink);flex:none}
+.cell .id{font:800 max(10px,1.9cqw)/1 var(--f-display);padding:3px 4px 0}
+.cell .nm{font-size:max(7px,1.2cqw);line-height:1.1;padding:0 4px;color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;flex:1}
+.cell .pips{display:flex;gap:2px;padding:0 4px 4px}
+.cell .pips i{flex:1;height:4px;background:var(--line);max-width:14px}
+.cell .pips i.on{background:var(--ink)}
+.cell .pips i.on.h{background:var(--accent)}
+.cell.corner,.cell.special{align-items:center;justify-content:center;text-align:center;font:800 max(9px,1.45cqw)/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.02em;padding:3px;overflow-wrap:anywhere}
+.cell small{display:block;margin-top:2px;font:500 max(7px,1.1cqw)/1.1 var(--f-body);text-transform:none;letter-spacing:0;color:var(--muted)}
+.cell.here{outline:3px solid var(--accent);outline-offset:-3px;z-index:2}
+.cell.sel{box-shadow:inset 0 0 0 3px var(--focus)}
+.tok{position:absolute;right:4px;top:26%;width:max(14px,2.6cqw);height:max(14px,2.6cqw);border-radius:50%;background:var(--accent);border:2px solid var(--surface);box-shadow:0 0 0 2px var(--ink)}
+.cell .ab{display:none}
+@container (max-width:560px){.cell .nm{display:none}.cell .pips i{height:3px}.cell .pips{padding:0 2px 2px}.cell .id{padding:2px 2px 0;font-size:9px}.cell .full{display:none}.cell .ab{display:block;font:800 9px/1 var(--f-display)}.cell.corner,.cell.special{padding:1px}.tok{width:11px;height:11px;right:2px;top:30%}}
+.center{grid-area:2/2/9/9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px;text-align:center;overflow:hidden;min-width:0}
+.center h2{margin:0;font:800 clamp(16px,3.6cqw,30px)/1 var(--f-display);text-transform:uppercase}
+.center p{margin:0;font-size:clamp(11px,1.9cqw,15px);color:var(--muted);max-width:44ch}
+.dice{display:flex;gap:10px}
+.die{width:clamp(40px,7cqw,60px);height:clamp(40px,7cqw,60px);display:grid;place-items:center;background:var(--surface);border:2px solid var(--ink);border-radius:10px;font:800 clamp(20px,4cqw,32px) var(--f-display);box-shadow:var(--shadow)}
+.btn{padding:10px 18px;border:2px solid var(--ink);background:var(--surface);border-radius:6px;font:800 14px var(--f-display);letter-spacing:.05em;text-transform:uppercase}
+.btn:hover:not(:disabled){background:var(--surface2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover:not(:disabled){filter:brightness(1.08);background:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.small{padding:6px 10px;font-size:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.seg{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.seg button{padding:5px 10px;border:1px solid var(--ink);background:var(--surface);border-radius:999px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+/* side */
+.side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 8px;font:800 13px var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.deed{border:2px solid var(--ink);background:var(--surface);padding:0;border-radius:2px}
+.deed .dh{padding:8px 12px;border-bottom:2px solid var(--ink);border-top:12px solid var(--c);text-align:center}
+.deed .dh small{display:block;font:700 11px var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.deed .dh b{display:block;font:800 19px/1.15 var(--f-display);text-transform:uppercase}
+.deed .db{padding:10px 14px;font-size:14.5px}
+.deed .db h4{margin:10px 0 4px;font:800 11px var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.deed .db p{margin:0 0 6px}
+.deed .db ul{margin:0;padding-left:18px}
+.deed .db li{margin-bottom:4px}
+.deed .src{font-size:12.5px;color:var(--muted);border-top:1px dashed var(--line);margin-top:8px;padding-top:6px}
+.mastery{display:grid;gap:6px}
+.mrow{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center;font-size:14px}
+.mrow i{width:10px;height:10px;background:var(--c)}
+.mrow .bar{display:flex;gap:2px}
+.mrow .bar b{width:16px;height:8px;background:var(--line)}
+.mrow .bar b.on{background:var(--ink)}
+.mrow .bar b.h{background:var(--accent)}
+.log{margin:0;padding:0;list-style:none;display:grid;gap:6px;font-size:13.5px;max-height:240px;overflow:auto}
+.log li{padding-left:8px;border-left:3px solid var(--line)}
+.log li.good{border-color:var(--good)}.log li.bad{border-color:var(--bad)}
+.hint{font-size:13px;color:var(--muted)}
+/* dialog */
+dialog{width:min(680px,calc(100vw - 24px));max-height:calc(100vh - 24px);padding:0;border:2px solid var(--ink);border-radius:8px;background:var(--surface);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(10,18,14,.6)}
+.dlgin{padding:18px 20px 20px;display:grid;gap:12px}
+.qhead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border-top:10px solid var(--c);padding-top:10px}
+.chip{display:inline-block;padding:2px 10px;border:1px solid var(--ink);border-radius:999px;font:700 12px var(--f-display);letter-spacing:.05em;text-transform:uppercase}
+.tier{font:600 12.5px var(--f-mono);color:var(--muted)}
+.dlgin h2{margin:0;font:700 20px/1.3 var(--f-body)}
+.opts{display:grid;gap:8px}
+.opt{text-align:left;padding:11px 14px;border:2px solid var(--line);background:var(--surface2);border-radius:6px;line-height:1.35}
+.opt:hover:not(:disabled){border-color:var(--ink)}
+.opt.right{border-color:var(--good);background:color-mix(in srgb,var(--good) 16%,var(--surface))}
+.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,var(--surface))}
+.opt:disabled{cursor:default}
+.banner{padding:10px 14px;border-radius:6px;font-weight:700}
+.banner.good{background:color-mix(in srgb,var(--good) 18%,var(--surface));border:1px solid var(--good)}
+.banner.bad{background:color-mix(in srgb,var(--bad) 16%,var(--surface));border:1px solid var(--bad)}
+.banner.neutral{background:var(--surface2);border:1px solid var(--line)}
+textarea{width:100%;min-height:120px;padding:10px;border:2px solid var(--line);background:var(--surface2);border-radius:6px;resize:vertical}
+.checks{display:grid;gap:6px}
+.checks label{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface2)}
+.checks input{margin-top:4px;width:18px;height:18px;flex:none}
+.right-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+/* other panes */
+.pane h2.ph{margin:0 0 4px;font:800 24px var(--f-display);text-transform:uppercase}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-block:10px}
+.tools input[type=search]{flex:1 1 220px;min-width:0;padding:9px 12px;border:2px solid var(--line);background:var(--surface);border-radius:6px}
+details.dd{background:var(--surface);border:1px solid var(--line);border-left:10px solid var(--c);border-radius:4px;margin-bottom:8px}
+details.dd summary{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:10px 12px;cursor:pointer;list-style:none}
+details.dd summary::-webkit-details-marker{display:none}
+details.dd summary b{font:800 15px var(--f-display);text-transform:uppercase}
+details.dd summary span.dn{color:var(--muted);font-size:13px;flex:1 1 220px}
+details.dd .deed{margin:0 12px 12px}
+.eslist{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-block:12px}
+.eslist button{text-align:left;padding:12px;background:var(--surface);border:2px solid var(--line);border-radius:6px}
+.eslist button[aria-pressed="true"]{border-color:var(--ink)}
+.eslist button b{display:block;font:800 13px var(--f-display);letter-spacing:.06em;text-transform:uppercase}
+.eslist button span{font-size:13px;color:var(--muted)}
+.mockq{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:10px}
+.mockq .qn{font:600 12px var(--f-mono);color:var(--muted)}
+.mockq label{display:flex;gap:10px;padding:6px 4px;align-items:flex-start;cursor:pointer}
+.mockq label input{margin-top:4px;flex:none}
+.mockq.ok{border-color:var(--good)}.mockq.no{border-color:var(--bad)}
+.big{font:800 44px/1 var(--f-display)}
+.sr{position:absolute;left:-9999px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head><body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Price of Place</h1>
+      <p>SOCY/COMM 1511 midterm board game &middot; roll, land on a deed, answer to earn it.</p>
+    </div>
+    <div class="hud" id="hud" aria-live="polite"></div>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Game sections">
+    <button role="tab" data-tab="play" aria-selected="true">Board</button>
+    <button role="tab" data-tab="deeds" aria-selected="false">Deed Book</button>
+    <button role="tab" data-tab="essays" aria-selected="false">Essay Locker</button>
+    <button role="tab" data-tab="mock" aria-selected="false">Mock Midterm</button>
+  </nav>
+  <section class="pane" id="pane-play">
+    <div class="play">
+      <div class="boardwrap"><div class="board" id="board"></div></div>
+      <aside class="side">
+        <div class="card" id="deedcard"></div>
+        <div class="card"><h3>District mastery</h3><div class="mastery" id="mastery"></div></div>
+        <div class="card"><h3>Turn log</h3><ul class="log" id="log"></ul></div>
+      </aside>
+    </div>
+  </section>
+  <section class="pane" id="pane-deeds" hidden></section>
+  <section class="pane" id="pane-essays" hidden></section>
+  <section class="pane" id="pane-mock" hidden></section>
+</div>
+<dialog id="dlg" aria-modal="true"></dialog>
+<script>
+// ===== DATA PART 1: Districts A-B (Unit 1 foundations) =====
+// mc(question, correct, [wrong x3], why)   ex(question, [key points])
+const mc = (q, a, w, why) => ({ k: 'mc', q, a, w, why: why || '' });
+const ex = (q, key) => ({ k: 'ex', q, key });
+
+const D_A = {
+  id: 'A', name: 'Sociology Basics', short: 'Sociology', color: '#8a5a3c', unit: 'Unit 1',
+  props: [
+    {
+      id: 'A1', name: 'Discipline & Perspective', price: 60,
+      deed: {
+        def: 'A DISCIPLINE is a branch of learning or body of knowledge (engineering, psychology, computer science, criminal justice, dance, sociology). A DISCIPLINARY PERSPECTIVE is the specific lens used to study a topic; it relies on the unique theories, concepts, and rules of a single academic field. SOCIOLOGY is the systematic study of society, social behavior, and how social forces, institutions, and structures shape people’s lives.',
+        ex: [
+          'Obesity in the US (CDC maps, 1985–2020): a sociologist asks how rates differ by year, state, age, and race/ethnicity — not just “what did this person eat?”',
+          'The “Interdisciplinary Response” slides: the same topic raises different questions in different disciplines.',
+          'Sociology answers: what do sociologists do, and who or what do they study? (groups, institutions, patterns — not single individuals).'
+        ],
+        src: 'Sociology Basics slides (08-19). The definition of sociology itself was on an image slide — wording above is the standard one; check it against your notes.'
+      },
+      qs: [
+        mc('In class, an academic “discipline” was described as:', 'A branch of learning or body of knowledge, such as engineering, psychology, or sociology', ['A set of penalties for breaking campus rules', 'One theory used to explain all human behavior', 'A professor’s job title'], 'Discipline = branch of learning / body of knowledge.'),
+        mc('A “disciplinary perspective” is best described as:', 'A lens for studying a topic built on the theories, concepts, and rules of a single academic field', ['An individual’s personal opinion about a topic', 'A blend of every field’s methods into one approach', 'The list of majors a university offers'], 'The lens belongs to one field and relies on its unique theories and concepts.'),
+        mc('A psychologist, an economist, and a sociologist all study rising obesity rates. Which research question is MOST characteristically sociological?', 'How do obesity rates differ across states, age groups, races/ethnicities, and years, and what social conditions explain the patterns?', ['Which brain chemicals make one person crave sugar?', 'How should one patient pick a diet plan this month?', 'How does one person’s weight change their personal sleep quality?'], 'Sociology looks at patterns across groups, places, and time and at the social forces behind them.'),
+        ex('DESCRIBE sociology and EXPLAIN what the discipline contributes to what is known about our social world. Give an EXAMPLE of how a sociological interest in a social phenomenon differs from another discipline’s.', [
+          'Sociology = systematic study of society, social behavior, and how social forces/institutions shape lives',
+          'Contribution: reveals patterns and structures behind what looks like individual choice; asks “who benefits and who suffers?”',
+          'A discipline gives a perspective/lens with its own theories and concepts',
+          'Example: obesity — other fields focus on an individual’s body, diet, or choices; sociology maps patterns by time, place, age, race/ethnicity and social conditions'
+        ])
+      ]
+    },
+    {
+      id: 'A2', name: 'Sociological Imagination', price: 60,
+      deed: {
+        def: 'C. Wright Mills (1959): the quality of mind that lets us see the link between individual experience (BIOGRAPHY) and the larger social and historical forces (HISTORY). Sociology lies at the intersection of history and biography. Its most useful distinction is between PERSONAL TROUBLES of milieu (private matters within a person’s immediate relations, where the person’s own values feel threatened) and PUBLIC ISSUES of social structure (matters that transcend local settings and involve institutions; publics feel a cherished value is threatened).',
+        ex: [
+          'Mills’s unemployment example: one man jobless in a city of 100,000 is a personal trouble; 15 million unemployed out of 50 million workers is a public issue — “the very structure of opportunities has collapsed.”',
+          'Mills on marriage: a divorce rate of 250 per 1,000 first-four-year marriages signals a structural issue, not just individual troubles.',
+          'Practice (slides): ask “who benefits and who suffers?”; notice how people are categorized (good/bad, deviant/“normal”); question assumptions that seem “natural.”',
+          'Zinno’s “Beth”: she blames herself for being stuck at work when a glass ceiling may be the cause.'
+        ],
+        src: 'Mills, “The Promise” (1959); Sociology Basics slides; Zinno (Engaged Sociology, 2018).'
+      },
+      qs: [
+        mc('What does it mean to say sociology lies at the intersection of history and biography?', 'Understanding a person’s life requires understanding the historical and social setting that shapes it, and vice versa', ['Sociologists should study only historical documents, not living people', 'Biographies of famous people are the main data for sociology', 'Individual lives and society are unrelated'], 'Mills: neither the life of an individual nor the history of a society can be understood without both.'),
+        mc('“Connecting private troubles with public issues” means:', 'Seeing that problems people experience personally often reflect structural patterns affecting many people', ['Believing individuals have no responsibility for anything', 'Treating every problem as a flaw in personal character', 'Keeping personal life and public life completely separate'], ''),
+        mc('A student cannot find an affordable apartment in Charlotte, and thousands of other residents report the same problem. Which response uses the sociological imagination?', 'Investigate how the housing market, wages, zoning, and policy create that pattern for many residents', ['Conclude she did not budget carefully enough', 'Assume rents are naturally high and nothing explains them', 'Focus only on her roommates’ habits'], 'When many people share the problem, it is a public issue with structural causes (Mills).'),
+        ex('EXPLAIN the sociological imagination: what are “history” and “biography,” how do personal troubles differ from public issues, and how does it help us view society?', [
+          'Mills: a quality of mind that connects individual experience to larger social forces',
+          'Biography (individual life) and history (period/society) must be understood together',
+          'Troubles = private, within immediate milieu; issues = public, structural, institutional',
+          'Example: 1 unemployed man vs. 15 million unemployed (or housing affordability)',
+          'Habits: ask who benefits/suffers, how people are categorized, question “natural” assumptions'
+        ])
+      ]
+    },
+    {
+      id: 'A3', name: 'Individual vs. Structural Thinking', price: 80,
+      deed: {
+        def: 'The INDIVIDUALISTIC perspective explains outcomes by personal choices, traits, and effort. The SOCIOLOGICAL (structural) perspective explains them by social structure — patterns of relationships, institutions, and unequal access to resources. Terms: SOCIETY = people sharing a territory and culture; SOCIAL INSTITUTION = an established set of norms organized around a basic social need (family, education, economy, government, religion); SOCIAL STRUCTURE = the patterned arrangements and relationships that organize society; SOCIAL CONSTRUCT = an idea or category that exists because society collectively treats it as real, not because it is natural.',
+        ex: [
+          'Obesity from an individualist perspective = willpower, diet, exercise; from a sociological perspective = trends by year, state, age, and race/ethnicity (CDC maps).',
+          'The American Dream’s hidden message — “if I fail, it is 100% my fault” — is individualistic; structural barriers (class, race, gender) are left out.',
+          '“Thinking structurally”: asking what institutions, policies, and unequal resources produce an outcome.'
+        ],
+        src: 'Sociology Basics slides; Zinno (2018). Definitions of society / institution / structure / construct are the standard textbook ones — the slide versions were on images.'
+      },
+      qs: [
+        mc('Which statement reflects an INDIVIDUALISTIC perspective on obesity?', 'People are overweight because they lack willpower and make poor food choices', ['Obesity rates differ sharply by state, age, and race/ethnicity', 'Access to affordable healthy food varies with income and neighborhood', 'National obesity maps changed dramatically between 1990 and 2010'], 'Individualism blames personal traits and choices.'),
+        mc('A “social construct” is:', 'An idea or category that exists because society collectively treats it as real', ['A building planned by city engineers', 'A natural fact identical in every society', 'An opinion held by a single person'], ''),
+        mc('A news segment says recent graduates are unemployed because “young people are lazy.” Which reframing THINKS STRUCTURALLY?', 'Look at hiring patterns, regional job markets, student debt, and which industries are growing', ['Ask each graduate to rate their own motivation', 'Compare graduates’ personalities', 'Assume the labor market always rewards effort fairly'], 'Structural thinking examines institutions and conditions, not just individuals.'),
+        ex('COMPARE an individualistic and a sociological perspective on a social problem (e.g., obesity or the American Dream). Give examples of thinking structurally.', [
+          'Individualistic: personal choices, effort, character',
+          'Sociological: social structure, institutions, patterns across groups/places/time',
+          'Example: obesity maps by state/age/race, not just willpower',
+          'Key terms: society, social institution, social structure, social construct',
+          'Structural thinking questions “natural” assumptions and asks who benefits/suffers'
+        ])
+      ]
+    }
+  ]
+};
+
+const D_B = {
+  id: 'B', name: 'Rhetoric Basics', short: 'Rhetoric', color: '#3b7fb8', unit: 'Unit 1',
+  props: [
+    {
+      id: 'B1', name: 'Rhetoric & the Rhetorical Situation', price: 100,
+      deed: {
+        def: 'RHETORIC is a set of principles that explain and predict how people make meaning and interact — an “operating system” for human communication (compared to gravity: always at work). It also means the artful use of those principles. “Texts are people talking.” Rhetorical analysis considers: AUDIENCE (intended vs. actual/“addressed”), PURPOSE (may be several), GENRE (recognizable categories of texts, structured by creators’ and audiences’ needs — like houses), EXIGENCE (the need or reason for the communication), KAIROS (“lucky timing” — what makes sense to say in that moment).',
+        ex: [
+          'Finals week: a library loses access to all research databases; ten minutes later the Library Communications director emails alternative open-access links. Exigence = the loss of access; kairos = finals-week timing.',
+          'Genre like houses: a syllabus, a tweet, and a lease each follow forms readers recognize.',
+          'Intended vs. addressed audience: an ad aimed at first-time buyers may actually reach, and exclude, many others.'
+        ],
+        src: 'Rhetoric Basics slides (08-24); Procedural Rhetorics review questions 2–3 (09-09).'
+      },
+      qs: [
+        mc('“Exigence” refers to:', 'The need or reason for a piece of communication to occur', ['The lucky timing of the message', 'The group the creator hopes to reach', 'The category or type of text'], ''),
+        mc('How does an INTENDED audience differ from an ADDRESSED (actual) audience?', 'Intended = who the creator was trying to reach; addressed/actual = who the piece really reaches', ['They are two names for the same group', 'Intended = people who disagree; addressed = people who agree', 'Intended = the genre; addressed = the purpose'], ''),
+        mc('During finals week a library loses all online research databases. Ten minutes later, Library Communications emails direct links to open-access alternatives. What roles do exigence and kairos play?', 'The loss of access was the exigence; the finals-week panic made the timing (kairos) fit', ['The student body was the kairos; the email medium was the exigence', 'The subject line was the exigence; the length was the kairos', 'The library policy was the exigence; the email was the kairos'], 'Exigence = the need; kairos = timing/right moment.'),
+        ex('DEFINE and DESCRIBE “rhetoric” and name the elements you consider in a rhetorical analysis.', [
+          'Rhetoric = principles that explain/predict how people make meaning and interact (“operating system”; also the artful use)',
+          'Audience (intended vs. addressed) and purpose (can be multiple)',
+          'Genre — recognizable text categories shaped by needs (like houses)',
+          'Exigence (the need) and kairos (lucky timing)',
+          '“Texts are people talking”'
+        ])
+      ]
+    },
+    {
+      id: 'B2', name: 'Ethos, Pathos, Logos & Mythos', price: 100,
+      deed: {
+        def: 'The rhetorical APPEALS: ETHOS = appeal to the character, credibility, or personal qualities of a person (e.g., “hard work explains success”); PATHOS = appeal to emotion; LOGOS = appeal to logic, reason, and evidence. MYTHOS = a shared sense of how the world works or deep foundational beliefs — many appeals we label “pathos” are more accurately appeals to mythos.',
+        ex: [
+          'Rags-to-riches stories (Horatio Alger; Benjamin Franklin’s Autobiography) appeal to ethos: personal qualities are the primary reason for success or failure.',
+          'The American Dream itself works as mythos — a shared story of how the world works (work hard, get ahead).',
+          'An ad that says “You earned this” beside a new house blends ethos and mythos.'
+        ],
+        src: 'Rhetoric Basics and American Dream slides; “American Dream (ethos)” reading.'
+      },
+      qs: [
+        mc('“Mythos” refers to:', 'A shared sense of how the world works or deep foundational beliefs', ['Appeals built on statistics and evidence', 'An appeal built on the speaker’s credentials', 'A fear-based emotional appeal only'], ''),
+        mc('A message claiming success comes mainly from an individual’s hard work and personal qualities is chiefly an appeal to:', 'Ethos', ['Pathos', 'Logos', 'Genre'], 'The American Dream’s rags-to-riches stories lean on ethos.'),
+        mc('An ad shows a family on their porch in front of a new house with the slogan “You earned this.” Which analysis is best?', 'It draws on mythos (the American Dream) and ethos (hard work earns reward) while leaving out structural barriers', ['It is purely logos because it offers statistics', 'It has no audience or purpose', 'It is only an image and makes no argument'], ''),
+        ex('NAME and DESCRIBE the rhetorical appeals (include mythos). Why do sociologists question the ethos appeal in American Dream stories?', [
+          'Ethos = personal qualities/credibility; pathos = emotion; logos = logic/evidence',
+          'Mythos = shared beliefs about how the world works (often what we call pathos)',
+          'Rags-to-riches stories (Alger, Franklin) credit individual character',
+          'Sociologists: that framing hides structural barriers and blames individuals for failure'
+        ])
+      ]
+    },
+    {
+      id: 'B3', name: 'Visual & Spatial Rhetoric', price: 120,
+      deed: {
+        def: 'VISUAL RHETORIC = use of images as argument; the arrangement of elements on a page; typography (fonts); analysis of existing images and visuals. SPATIAL RHETORIC = understanding physical spaces and places as communicative (rhetorical); the arrangement of objects in physical space; analysis of place and space, especially with reference to accessibility.',
+        ex: [
+          'Visual: we can guess what musicians sound like from their photos (class activity).',
+          'Spatial: a classroom renovated with tables seating four students facing one another non-verbally signals that peer interaction and group discussion are expected.',
+          'Spatial (accessibility): ramps, stairs, and entrances on a campus say who is expected to move through a space — bring in your own UNC Charlotte campus example for the exam.',
+          'Home as space: Ozaki’s English homes (separate rooms, en-suite baths) vs. Japanese homes (flexible, multi-use rooms) make different arguments about privacy.'
+        ],
+        src: 'Rhetoric Basics slides (08-24); Procedural Rhetorics review Q4.'
+      },
+      qs: [
+        mc('Spatial rhetoric treats physical space as:', 'Communicative — the arrangement of places and objects makes arguments and sends messages', ['Neutral and unrelated to behavior', 'Only a matter of decoration', 'A fixed legal boundary'], ''),
+        mc('Which pair are both features of VISUAL rhetoric from class?', 'Use of images as argument and typography', ['Gini coefficient and quintiles', 'Primary and secondary sources', 'Commodity and decommodification'], ''),
+        mc('A university replaces individual chairs with tables seating four students facing each other. From a spatial-rhetoric perspective, the main communicative impact is:', 'It non-verbally signals that peer interaction and group discussion are expected', ['It uses typography to convince students to take seminars', 'It proves room layout does not influence behavior', 'It is a capstone project for architecture majors'], ''),
+        ex('DEFINE and DESCRIBE spatial rhetoric. Give at least two examples (lecture, pre-class assignments, or the UNC Charlotte campus).', [
+          'Spatial rhetoric = physical spaces/places as communicative; arrangement of objects; accessibility',
+          'Example 1: classroom tables facing each other signal group discussion',
+          'Example 2: a campus space or home layout (e.g., Ozaki’s England vs. Japan)',
+          'Explain what message the arrangement sends and to whom'
+        ])
+      ]
+    }
+  ]
+};
+// ===== DATA PART 2: Districts C-E =====
+const D_C = {
+  id: 'C', name: 'Commodity vs. Right', short: 'Housing', color: '#d9782d', unit: 'Unit 1',
+  props: [
+    {
+      id: 'C1', name: 'Housing as a Commodity', price: 140,
+      deed: {
+        def: 'A COMMODITY is something bought and sold in a market for its exchange value (its price). Viewing housing as a commodity means treating homes as market goods and investments, financed by mortgages and valued by the market. Sociologists add that the market is socially and politically created, not value-free: prices capitalize schools, amenities, neighbors, crime, taxes, and zoning.',
+        ex: [
+          'Policies that treat housing as a commodity: the mortgage interest deduction, tax breaks for real estate investors, selling public housing to private for-profit owners, converting apartments to condos for sale.',
+          'Pattillo (2013): sociologists study the “real estate infrastructure” (Gotham 2002) — homebuilders, lenders, insurers, appraisers, agents, and the state.',
+          'Study: Flippen (2004) found homes in Black and Hispanic neighborhoods appreciate more slowly — a Black owner’s home would be worth about $24,500 more in the same neighborhood as the average white owner.',
+          'Study: Jackson (1985) / Stuart (2003) — HOLC appraisals tied lower values to racial composition (redlining).',
+          'Cost burden: paying more than 30% of income on housing (53% of renters, 38% of owners in 2010).'
+        ],
+        src: 'Housing: Commodity vs Right (Pattillo 2013); What is Housing? slides; Homeownership Variation quiz Q1–Q2.'
+      },
+      qs: [
+        mc('A policy like the mortgage interest deduction is an example of the state’s role in promoting housing as a ____.', 'Commodity', ['Right', 'Public good', 'Social service'], 'It subsidizes owning — treating housing as an investment/market asset (class quiz Q2).'),
+        mc('Which is an example of a policy that treats housing as a COMMODITY?', 'Offering tax breaks to real estate investors', ['Providing rental assistance to low-income families', 'A land trust keeping homes permanently affordable', 'Building public housing for tenants'], ''),
+        mc('A researcher studies how appraisers, lenders, and agents shape the prices of homes in neighborhoods of different racial composition. This research most clearly treats housing as a:', 'Commodity — she is studying the market that assigns exchange value', ['Right — she is studying a guarantee of shelter', 'Culture — she is studying material objects', 'Genre — she is studying text categories'], 'Appraisals, lending, and prices are the machinery of the housing market.'),
+        ex('EXPLAIN what it means to view housing as a COMMODITY, and DESCRIBE one published research study.', [
+          'Commodity = bought/sold for exchange value; housing as market good and investment',
+          'The market is socially/politically created (zoning, schools, taxes, appraisals)',
+          'Policy examples: mortgage interest deduction, tax breaks for investors, selling public housing',
+          'Study example: Flippen 2004 / Jackson 1985 / Gotham 2002 (name author, what they found)',
+          'Consequence: property values drive wealth stratification; people can be priced out'
+        ])
+      ]
+    },
+    {
+      id: 'C2', name: 'Housing as a Right', price: 140,
+      deed: {
+        def: 'Viewing HOUSING AS A RIGHT means everyone is entitled to decent, safe, affordable housing regardless of ability to pay; housing is a social need to be guaranteed, not only a market good. Evidence of the idea: the UN Universal Declaration of Human Rights (1948, Art. 25) and 89 countries that mention housing rights in their constitutions (the US is not among them); the US 1949 Housing Act’s goal of “a decent home and a suitable living environment for every American family” is a goal, not a legal right.',
+        ex: [
+          'Policies that treat housing as a right: rental assistance for low-income families, public housing, vouchers.',
+          'Research: tenant activism in public housing — Small 2004 (Boston), Williams 2004 (Baltimore), Arena 2012 (St. Thomas, New Orleans rent strike), Pattillo 2007.',
+          'Research: Bratt et al. (2006), “A Right to Housing”; Desmond (2012) on eviction in Milwaukee (Black women had the highest eviction incidence).',
+          'Local case in class: affordable housing in Charlotte analyzed as exceptional, purposeful, consequential.'
+        ],
+        src: 'Pattillo (2013); Homeownership Variation quiz Q1; What is Housing? slides.'
+      },
+      qs: [
+        mc('Which is an example of a policy that treats housing as a RIGHT?', 'Providing rental assistance to low-income families', ['Eliminating zoning laws', 'Selling public housing to private owners', 'Offering tax breaks to real estate investors'], 'Class quiz Q1.'),
+        mc('Which is cited in Pattillo’s review as international recognition of a right to housing?', 'The 1948 Universal Declaration of Human Rights (Article 25)', ['The 1934 National Housing Act', 'The 1968 Fair Housing Act', 'The 1916 Federal Land Bank system'], ''),
+        mc('Residents of a public housing development organize a rent strike to stop demolition. Their activism most clearly rests on viewing housing as:', 'A right', ['A commodity', 'A status symbol', 'A form of material culture only'], 'They are demanding shelter as an entitlement, not as a market purchase.'),
+        ex('EXPLAIN what it means to view housing as a RIGHT, and DESCRIBE one previously published research study.', [
+          'Right = decent, affordable housing as entitlement regardless of ability to pay',
+          'Policy examples: rental assistance, public housing; legal: UDHR 1948 Art. 25, 1949 Housing Act goal',
+          'Study example: tenant activism research (Small, Williams, Arena, Pattillo 2007) or Bratt et al. 2006',
+          'Contrast: the commodity view treats housing as exchange value'
+        ])
+      ]
+    },
+    {
+      id: 'C3', name: 'Decommodification', price: 160,
+      deed: {
+        def: 'DECOMMODIFICATION = taking housing out of, or limiting, the market so it serves need rather than profit. Forms of “social ownership”: public housing, nonprofit housing, limited-equity cooperatives, and community land trusts. Pattillo cautions that the commodity/right dichotomy is “overly stylized”: real systems mix both (vouchers, tax breaks, public ownership), and homelessness amid nearly 18 million vacant units (2012) shows the tension.',
+        ex: [
+          'Class quiz Q3: a community land trust taking ownership of land so homes remain affordable long into the future = decommodification. (A developer selling condos, a family taking a mortgage, and the government selling public housing to private owners are NOT.)',
+          'Critical urban theory: “Cities for People, Not for Profit” (Brenner et al.); Lefebvre’s “right to the city.”',
+          'Mixed systems: a city that funds vouchers for renters AND mortgage tax breaks for owners.'
+        ],
+        src: 'What is Housing? slides; Homeownership Variation quiz Q3; Pattillo (2013).'
+      },
+      qs: [
+        mc('What is an example of “decommodification” in the housing market?', 'A community land trust takes ownership of land so homes remain affordable long into the future', ['A developer converts an apartment building into condos for sale', 'A family takes out a mortgage to buy a first home', 'The government sells public housing units to for-profit companies'], 'Class quiz Q3.'),
+        mc('Which is NOT a form of “social ownership” named in Pattillo’s review?', 'Speculative flipping of single-family homes', ['Limited-equity cooperatives', 'Community land trusts', 'Nonprofit housing'], ''),
+        mc('A city funds housing vouchers for renters AND offers a mortgage interest deduction for owners. What is Pattillo’s point?', 'Real housing policy mixes commodity and right logics, so the neat dichotomy is overly stylized', ['Only one logic can operate at a time', 'Vouchers are always commodification', 'Tax policy never affects housing'], ''),
+        ex('DEFINE decommodification, give an example, and EXPLAIN why Pattillo calls the commodity/right split “overly stylized.”', [
+          'Decommodification = removing housing from market logic so it serves need',
+          'Examples: community land trust, public/nonprofit housing, limited-equity co-ops',
+          'Real systems are mixed (vouchers, tax breaks, public ownership)',
+          'Homelessness alongside vacant units shows the tension'
+        ])
+      ]
+    }
+  ]
+};
+
+const D_D = {
+  id: 'D', name: 'American Dream & Culture', short: 'Dream', color: '#4a9a63', unit: 'Unit 1',
+  props: [
+    {
+      id: 'D1', name: 'Culture & Housing', price: 180,
+      deed: {
+        def: 'CULTURE = the knowledge, language, values, customs, and material objects passed from person to person and generation to generation in a group or society; shared beliefs, values, and practices. MATERIAL CULTURE = objects or belongings of a group. NON-MATERIAL CULTURE = ideas, attitudes, and beliefs, including symbols, gestures, and language. VALUES = a culture’s standard for what is good and just, beautiful or ugly, sought or avoided. BELIEFS = tenets or convictions people hold to be true. Housing is a reflection of culture.',
+        ex: [
+          'Ozaki’s England–Japan study: England stresses home-centred living and personal privacy/individualism — separate rooms for specific purposes, en-suite baths (18% of 1970s houses → 100% in the 1990s).',
+          'Japan: family-centred living and familial privacy; flexible, multi-use spaces and sliding doors; modesty and minimalism; entrance hall for removing shoes; all-in-one kitchen/dining/living room (6% → 87%).',
+          'Class prompt: what symbols, colors, flags, and furnishings in and around your home send messages? (And how does it smell?)',
+          'Is the American Dream a value or a belief? It works as both — a value (success, ownership) and a belief (that effort leads to it).'
+        ],
+        src: 'American Dream Day 2 slides; Ozaki, “Housing as a Reflection of Culture” (slides cite 2010; the article is Housing Studies 17(2)).'
+      },
+      qs: [
+        mc('Material culture is:', 'The objects or belongings of a group of people', ['The ideas, attitudes, and beliefs of a society', 'Symbols, gestures, and language', 'A culture’s standard for what is good and just'], ''),
+        mc('Which pairing matches Ozaki’s contrast of housing in England and Japan?', 'England: personal privacy and individualism; Japan: familial privacy with flexible, multi-use space', ['England: sliding doors and flexible rooms; Japan: en-suite bathrooms for each person', 'Both: housing form has nothing to do with culture', 'England: familial privacy; Japan: individual privacy'], ''),
+        mc('A family hangs a flag on its porch, owns a framed family portrait, and believes a home should be a sanctuary. In terms of culture:', 'The flag and portrait are material culture; the sanctuary belief is non-material culture (a value/belief)', ['All three are material culture', 'All three are non-material culture', 'The flag is non-material; the belief is material'], ''),
+        ex('EXPLAIN how housing reflects culture, using examples from England and Japan. Define material vs. non-material culture, and values vs. beliefs.', [
+          'Culture = shared knowledge, language, values, customs, material objects',
+          'Material = objects; non-material = ideas, symbols, language',
+          'Values (good/bad standards) vs. beliefs (what people hold true)',
+          'England: separation of private/public, personal privacy, individualism',
+          'Japan: flexible multi-use rooms, sliding doors, familial privacy, modesty'
+        ])
+      ]
+    },
+    {
+      id: 'D2', name: 'The American Dream', price: 180,
+      deed: {
+        def: 'THE AMERICAN DREAM = the belief that individuals can achieve success (financial or otherwise) and happiness through their own efforts — hard work, perseverance. Rags-to-riches stories (Horatio Alger; Benjamin Franklin’s Autobiography) predate the phrase and appeal to ethos. SHIFTING SYMBOLS: 1700s–1800s = moral autonomy, political voice, land ownership; mid-1900s = suburbia, middle-class consumerism, homeownership; 21st century = financial and lifestyle autonomy, freedom from debt, remote flexibility.',
+        ex: [
+          'Critiques of the Dream: The Great Gatsby (Fitzgerald), Invisible Man (Ralph Ellison), the Beat Generation (Ginsberg); Mark Twain probed its dark side during the Gilded Age.',
+          'Franklin’s Autobiography: rise through industry and thrift, individualism, free will, optimism.',
+          'Jefferson’s “life, liberty and the pursuit of happiness” is an early statement of the Dream; Winthrop’s “City upon a Hill” (1630) another root.',
+          'Class activity: three images for a 5-second ad of the Dream today.'
+        ],
+        src: 'American Dream Day 1 and 2 slides; “American Dream (ethos)” reading; Zinno (2018).'
+      },
+      qs: [
+        mc('Which pair are early rags-to-riches sources that appeal to ethos?', 'Horatio Alger’s stories and Benjamin Franklin’s Autobiography', ['The Great Gatsby and Invisible Man', 'Growing Apart and The Promise', 'The Landlord’s Game and Monopoly'], 'Gatsby and Invisible Man are critiques, not rags-to-riches models.'),
+        mc('Which sequence of dominant American Dream symbols matches class (1700s–1800s → mid-1900s → 21st century)?', 'Land ownership and political voice → suburbia and homeownership → financial autonomy and freedom from debt', ['Suburbia → land ownership → remote flexibility', 'Freedom from debt → suburbia → political voice', 'Consumerism → land ownership → suburbia'], ''),
+        mc('A novel follows a man whose lavish pursuit of wealth ends in emptiness and tragedy. It is best understood as:', 'An anti-materialist critique of the American Dream, like The Great Gatsby', ['A rags-to-riches celebration of ethos', 'A procedural rhetoric of a video game', 'A primary source on homeownership rates'], ''),
+        ex('DESCRIBE the American Dream’s rhetorical appeal, how its symbols changed over time, and name two critiques.', [
+          'Dream = success/happiness through individual effort; rags-to-riches (Alger, Franklin) appeal to ethos',
+          '1700s–1800s: moral autonomy, political voice, land ownership',
+          'Mid-1900s: suburbia, consumerism, homeownership',
+          '21st century: financial/lifestyle autonomy, freedom from debt',
+          'Critiques: Gatsby, Invisible Man, Beat poets'
+        ])
+      ]
+    },
+    {
+      id: 'D3', name: 'Meritocracy & Mobility', price: 200,
+      deed: {
+        def: 'The IDEOLOGY OF MERITOCRACY = the belief that individual talent and effort determine success, shifting blame for structural failure onto the individual (the “myth of meritocracy”). INTERGENERATIONAL MOBILITY = how a family’s socioeconomic origin predicts where their children land. Reality: economic mobility is weak by any measure — “choose your parents wisely.” Key points from class: meritocratic framing obscures systemic barriers in housing and wealth accumulation; the American Dream is not merely a cultural belief — it is a material policy product tied directly to real estate.',
+        ex: [
+          'Zinno’s “Beth”: a Black woman who finished college but stays in the same position for five years hears a poor-to-rich success story and decides she must be doing something wrong — societal barriers (glass ceiling, social/cultural capital) become personal failures.',
+          'The hidden message of the Dream: “if I am a failure, it is my fault” — this takes society “off the hook.”',
+          'Gordon: economic segregation — living in enclaves of wealth or poverty — has hardened.',
+          'Class questions: To whom is the Dream available? Does hard work equal success?'
+        ],
+        src: 'American Dream Day 2 slides; Zinno (2018); Growing Apart.'
+      },
+      qs: [
+        mc('The “ideology of meritocracy” is the belief that:', 'Individual talent and effort determine success, which shifts blame for structural failure onto individuals', ['Rewards are assigned randomly', 'Family background alone determines success', 'Government should allocate all jobs equally'], ''),
+        mc('“Intergenerational mobility” refers to:', 'How a family’s socioeconomic origin predicts where their children land', ['Moving between cities during one’s career', 'Immigration across generations', 'Changes in housing styles over centuries'], ''),
+        mc('Maya works two jobs yet cannot save a down payment; Ben’s parents gift him one. Which analysis applies the sociological critique of meritocracy?', 'Family wealth passes advantage across generations, so effort alone does not explain the outcome', ['Maya simply does not value homeownership', 'Ben worked harder, as the outcomes show', 'Down payments never affect who buys a home'], ''),
+        ex('CONTRAST the American Dream as an individualistic narrative with sociological realities. Use meritocracy and intergenerational mobility.', [
+          'Dream = success through effort; meritocracy ideology blames individuals for failure',
+          'Sociology: structural barriers (class, race, gender, segregation) limit opportunity',
+          'Intergenerational mobility is weak (“choose your parents wisely”)',
+          'Example: Beth or housing/wealth accumulation as policy product'
+        ])
+      ]
+    }
+  ]
+};
+
+const D_E = {
+  id: 'E', name: 'Procedural Rhetoric & Methods', short: 'Procedure', color: '#b8433f', unit: 'Unit 2',
+  props: [
+    {
+      id: 'E1', name: 'Procedural Rhetoric', price: 220,
+      deed: {
+        def: 'PROCEDURAL RHETORIC = when processes or procedures (rules, mechanics, systems) are used for persuasive or expressive purposes — a system makes claims about the world through what it lets you do. Coined by Ian Bogost in his 2007 book Persuasive Games: The Expressive Power of Video Games. It is not exclusive to games, or even to video games.',
+        ex: [
+          'Mario Kart 8: question boxes know if you are in first place and give minimally useful items — the game’s procedural rhetoric suggests people who are further behind deserve more power-ups than those already ahead.',
+          'Overcooked 2 (assigned video): “If you want to succeed, you must communicate efficiently.”',
+          'Real-time mechanics vs. min-maxing: Animal Crossing New Horizons (2020) and Cozy Grove (2021) run on real time; Stardew Valley (2016) and Spiritfarer (2020) do not.',
+          'Non-video examples: the Landlord’s Game and Monopoly (tabletop); the in-class Monopoly activity, where starting cash and property by token argued that starting position shapes outcomes.',
+          'Exam rule: at least three examples; no more than two may be video games.'
+        ],
+        src: 'Procedural Rhetorics slides (09-09); Rhetorical Response slides (09-23).'
+      },
+      qs: [
+        mc('“Procedural rhetoric” describes the ways ____ or ____ are used to make claims about the world.', 'Processes or procedures', ['Images or fonts', 'Ethos or pathos', 'Primary or secondary sources'], 'Review question 1.'),
+        mc('Who coined “procedural rhetoric,” and in what work?', 'Ian Bogost, Persuasive Games (2007)', ['C. Wright Mills, The Sociological Imagination (1959)', 'Lizzie Magie, The Landlord’s Game (1904)', 'Colin Gordon, Growing Apart'], ''),
+        mc('Mario Kart 8 gives players in first place minimally useful items and players far behind much stronger ones. What claim does this procedure make?', 'People who are further behind deserve more power-ups than those already ahead', ['The winner should always get the best items', 'Luck should never affect a race', 'Everyone must communicate efficiently to win'], 'The last option is Overcooked 2’s claim.'),
+        ex('DEFINE and DESCRIBE procedural rhetoric. Give at least three examples (no more than two video games).', [
+          'Definition: processes/procedures used for persuasive or expressive purposes',
+          'Coined by Ian Bogost (Persuasive Games, 2007); not limited to video games',
+          'Example 1: Mario Kart 8 (catch-up items: those behind deserve more help)',
+          'Example 2: Overcooked 2 (succeed by communicating efficiently)',
+          'Example 3: Monopoly / Landlord’s Game / in-class Monopoly activity'
+        ])
+      ]
+    },
+    {
+      id: 'E2', name: "The Landlord's Game → Monopoly", price: 220,
+      deed: {
+        def: 'THE LANDLORD’S GAME was created by Elizabeth (Lizzie) Magie with an intentionally educational goal: to show how land monopoly and rent-collecting enrich landlords while impoverishing tenants. Its intended procedural rhetoric critiqued monopoly. What actually appealed to most players was the competitive, monopolist way of playing — which led to the development of Monopoly, whose popular play celebrates accumulating property and bankrupting opponents.',
+        ex: [
+          'Similarity: both are circuit-style board games where players buy properties, collect rent, and pass a salary space.',
+          'Difference: Magie designed the game to teach the harm of monopoly (educational/critical); Monopoly’s procedures reward monopoly itself.',
+          'Class prompt: how do we read Monopoly’s procedural rhetoric — and the procedures YOUR group created in the class game?',
+          'Check your notes for the exact names, dates, and rule sets given in lecture (the slide was an image).'
+        ],
+        src: 'Rhetorical Response slides (09-23); Procedural Rhetorics slides. Names/dates beyond the slide text are general knowledge — verify against your notes.'
+      },
+      qs: [
+        mc('Who created The Landlord’s Game?', 'Lizzie (Elizabeth) Magie', ['Ian Bogost', 'C. Wright Mills', 'Colin Gordon'], ''),
+        mc('What was the INTENDED purpose of The Landlord’s Game?', 'Educational — to show the problems of land monopoly and landlord rent-taking', ['Pure entertainment for family game night', 'To teach players how to bankrupt opponents', 'To advertise real estate agencies'], ''),
+        mc('Which is a significant DIFFERENCE between the Landlord’s Game and the popular Monopoly game?', 'The Landlord’s Game aimed to critique monopoly, while Monopoly’s popular play rewards getting property and bankrupting others', ['Only Monopoly has properties to buy', 'Only the Landlord’s Game has money', 'Monopoly has no procedural rhetoric'], ''),
+        ex('EXPLAIN the evolution of Monopoly from The Landlord’s Game, focusing on procedural rhetoric: name the creator(s), one similarity, one difference.', [
+          'Creator: Lizzie Magie (Landlord’s Game); also name who popularized Monopoly if given in lecture',
+          'Similarity: board circuit, buying properties, rent, salary',
+          'Difference: intended educational critique of monopoly vs. appeal of competitive monopoly play',
+          'Tie to procedural rhetoric: the procedures argue what is good (sharing vs. winning by crushing others)'
+        ])
+      ]
+    },
+    {
+      id: 'E3', name: 'Sources & Research Methods', price: 240,
+      deed: {
+        def: 'SOURCES: PRIMARY = first-hand information (records without interpretation, data gathered directly, original artworks/texts). SECONDARY = summarize, interpret, or restate primary sources. TERTIARY = index, organize, or compile other sources. METHODS: QUANTITATIVE = numerical data and statistics; QUALITATIVE = meanings and experiences (interviews, observation); MIXED METHODS = combine both; TEXTUAL / CONTENT ANALYSIS = systematically analyzing texts (e.g., TV episodes) for themes and patterns.',
+        ex: [
+          'TV-show activity: groups tried to gather quantitative data (racial/ethnic identity as a quantitative measure) but had to use secondary and tertiary sources; no content analysis, because they did not watch the shows; scope limited to one episode; few conclusions in the time allowed.',
+          'Next steps: watch the show (primary) for textual/content analysis; survey or research performers (quantitative); interview performers or study their interviews (qualitative); talk to fans/viewers (qualitative).',
+          'Smitheram & Nakai Kidd (2024): qualitative thematic analysis of 19 episodes of Your Home Made Perfect, plus coding episode demographics.',
+          'Ozaki: mixed methods (owner interviews + house-form data + official statistics). Rucks-Ahidiana: quantitative analysis of the 2016 Survey of Consumer Finances.'
+        ],
+        src: 'Rhetorical Response slides (sources/methods); Homeownership by Race slides (TV analysis debrief); the readings.'
+      },
+      qs: [
+        mc('An encyclopedia or database that compiles and indexes other sources is a ____ source.', 'Tertiary', ['Primary', 'Secondary', 'Qualitative'], ''),
+        mc('Watching episodes yourself and coding scenes and dialogue for themes is:', 'Textual / content analysis of a primary source', ['A quantitative survey of viewers', 'Use of tertiary sources', 'A secondary summary of previous research'], ''),
+        mc('Your group wants to continue the TV-show analysis. Which plan is strongest?', 'Watch the episodes for content analysis, survey/research performer demographics, and interview performers or fans', ['Read only a blog summary and count the cast', 'Use one episode and draw broad conclusions', 'Ask friends if they like the show'], 'Combine primary-source analysis with quantitative and qualitative data.'),
+        ex('Recall the TV-show analysis activity. DESCRIBE the best research methods and the types of sources you would consult to continue the analysis.', [
+          'Primary source: watch the show for textual/content analysis',
+          'Quantitative: gather performer demographics (surveys/research)',
+          'Qualitative: interview performers/study interviews; talk to fans/viewers',
+          'Source types: primary vs. secondary vs. tertiary; limits of the first attempt',
+          'Mixed methods can combine them'
+        ])
+      ]
+    }
+  ]
+};
+// ===== DATA PART 3: Districts F-G, Chest cards, Essay prompts =====
+const D_F = {
+  id: 'F', name: 'Social Stratification', short: 'Stratification', color: '#7c5cbf', unit: 'Unit 2',
+  props: [
+    {
+      id: 'F1', name: 'Hierarchy, Income, Wealth & Gini', price: 260,
+      deed: {
+        def: 'SOCIAL STRATIFICATION = society’s system of ranking categories of people in a hierarchy — class (money), but also race, gender, sexual orientation, ability status, and more. INCOME = salary or wages earned from a job plus earnings from other sources. WEALTH = value of all economic assets owned minus any debts/liabilities (own less owe). The GINI COEFFICIENT measures income or wealth inequality from 0 (perfect equality) to 1 (greatest inequality). Important wealth components: homeownership and financial assets (cash, mutual funds, stocks).',
+        ex: [
+          'Gordon: on the Gini index the US was second only to Portugal in 2000 and number one among OECD peers by 2010.',
+          'Income gaps and wealth gaps are charted by the Census Bureau (Wealth of Households 2020 and 2022) and the Federal Reserve’s distribution data since 1989.',
+          'Class questions: What is inequality? How do we measure it? Why does it matter?'
+        ],
+        src: 'Social Stratification slides (09-16); Growing Apart: Introduction (Gordon).'
+      },
+      qs: [
+        mc('A Gini coefficient of 0 means:', 'Perfect equality', ['Greatest possible inequality', 'Half the population is poor', 'Wealth equals income'], '0 = perfect equality; 1 = greatest inequality.'),
+        mc('Wealth is:', 'The value of all economic assets owned minus debts and liabilities', ['Salary or wages earned from a job', 'Only what a person inherits', 'Total annual earnings'], ''),
+        mc('A nurse earns $90,000 a year but owes $120,000 in loans and owns no assets. A retiree earns $20,000 a year but owns a paid-off home and $500,000 in investments. Which comparison is correct?', 'The nurse has the higher income; the retiree has the higher wealth', ['The nurse has both higher income and higher wealth', 'The retiree has both higher income and higher wealth', 'Their wealth is identical because income decides wealth'], 'Income is a flow of earnings; wealth is assets minus debts.'),
+        ex('DEFINE social stratification, income, wealth, and the Gini coefficient, and EXPLAIN how income and wealth differ.', [
+          'Stratification = ranking categories of people in a hierarchy (class, race, gender, etc.)',
+          'Income = wages/salary plus other earnings; wealth = assets minus debts',
+          'Gini: 0 = perfect equality, 1 = greatest inequality',
+          'Homeownership and financial assets are key wealth components'
+        ])
+      ]
+    },
+    {
+      id: 'F2', name: 'Quintiles & the Monopoly Activity', price: 260,
+      deed: {
+        def: 'QUINTILES divide households into five equal groups ranked from the top 20% to the bottom 20%. Wealth is distributed much more unequally than income — wealth is weighted more toward the upper end of the hierarchy (see the 2010 income vs. wealth quintile slides). Gordon: the richest 1% claims over a third of the nation’s wealth; the top 5% claim over 60%.',
+        ex: [
+          'Class Monopoly activity (token → quintile): Hat = top 20%: $3,915 start, $522 for passing Go, plus all 4 railroads and New York Ave ($1,000). Car = second 20%: $1,695; $226; North Carolina Ave ($300). Dog = middle: $1,043; $139; Oriental Ave ($100). Thimble/Dinosaur = fourth: $615; $82; no property. Wheelbarrow/Duck = bottom: $232; $31; no property.',
+          'Income = starting cash and pass-Go pay; wealth = starting property.',
+          'Reactions: the Hat felt little need to strategize; the Wheelbarrow struggled, asked for a loan or grant and was ignored; little sympathy when someone dropped out.',
+          'TED: Paul Piff, “Does Money Make You Mean?”'
+        ],
+        src: 'Social Stratification slides (09-16) — Monopoly Activity Debrief; Thinking Deeply About Housing slides (09-14).'
+      },
+      qs: [
+        mc('In the class Monopoly activity, which token represented the top 20% and collected $522 for passing Go?', 'The Hat', ['The Car', 'The Dog', 'The Wheelbarrow'], ''),
+        mc('Which is weighted more toward the upper end of the hierarchy in the US?', 'Wealth', ['Income', 'Both are distributed identically', 'Neither is concentrated'], ''),
+        mc('A Wheelbarrow player lands on a railroad owned by the Hat on the first turn, loses most of their cash, asks for a loan, and is ignored. What does this best illustrate?', 'Starting position in a stratified hierarchy shapes outcomes, and having few resources makes recovery difficult', ['Strategy matters more than starting resources', 'Social structure has no effect on outcomes', 'Everyone has equal opportunity to recover'], ''),
+        ex('What were the setup, reactions, and lessons of the in-class Monopoly activity about social stratification?', [
+          'Tokens represented income/wealth quintiles with different starting cash, pass-Go pay, and property',
+          'Income (cash, salary) vs. wealth (property) both stratified',
+          'Reactions by position: Hat saw no need to strategize; Wheelbarrow struggled; little sympathy',
+          'Lesson: the structure/starting position strongly shapes outcomes (Piff TED)'
+        ])
+      ]
+    },
+    {
+      id: 'F3', name: 'Exceptional, Purposeful, Consequential', price: 280,
+      deed: {
+        def: 'Colin Gordon (Growing Apart): US inequality is EXCEPTIONAL — more unequal now than ever and, “by a long shot,” more than peer developed democracies; PURPOSEFUL — the direct result of public policies designed to redistribute income and wealth upward, not an unhappy by-product of market forces; CONSEQUENTIAL — it hurts those left behind and damages economic and democratic prospects for everyone.',
+        ex: [
+          'Exceptional: the US ranks dead last among wealthy countries on the relevant inequality measures; number one in Gini among OECD peers by 2010.',
+          'Purposeful: political choices — not economic necessity — dismantled the New Deal (cuts to collective bargaining, tax cuts, deregulation, privatization); Lewis Powell’s 1971 memo to the US Chamber of Commerce. 1980–2014: pre-tax income of the bottom 20% fell 25% while the top 0.0001% gained over 600%.',
+          'Consequential: unequal societies see more illness, obesity, unhappiness, insecurity, and incarceration; stark inequality hollows out consumption and endangers democracy.',
+          'In class: affordable housing in Charlotte analyzed through all three lenses.'
+        ],
+        src: 'Growing Apart: Introduction (Gordon); Social Stratification and Homeownership Variation slides.'
+      },
+      qs: [
+        mc('Gordon says US inequality is “purposeful.” This means it:', 'Is the result of public policies designed to redistribute income and wealth upward', ['Is the unavoidable result of globalization and technology', 'Was planned by individual families', 'Is a temporary result of recessions'], ''),
+        mc('Which is evidence that US inequality is “exceptional”?', 'The US ranks as more unequal than peer developed democracies — number one in Gini among OECD peers by 2010', ['The US has the lowest Gini of any wealthy country', 'Inequality has never changed in US history', 'Every country has the same level of inequality'], ''),
+        mc('A policy brief argues that unequal societies see more illness, incarceration, and weakened democratic institutions. Which characteristic of inequality is it describing?', 'Consequential', ['Exceptional', 'Purposeful', 'Procedural'], ''),
+        ex('DESCRIBE what it means to say social stratification in the US is exceptional, purposeful, and consequential, with an EXAMPLE for each.', [
+          'Exceptional: more unequal than ever and than peer democracies (Gini, OECD)',
+          'Purposeful: policy choices redistributed upward (dismantling New Deal, tax cuts, deregulation)',
+          'Consequential: harms the left-behind and the economy/democracy (health, incarceration, consumption)',
+          'Give one concrete example for EACH characteristic'
+        ])
+      ]
+    }
+  ]
+};
+
+const D_G = {
+  id: 'G', name: 'Homeownership & the Wealth Gap', short: 'Wealth Gap', color: '#c9a227', unit: 'Unit 2',
+  props: [
+    {
+      id: 'G1', name: 'Homeownership Variation', price: 300,
+      deed: {
+        def: 'Census Bureau (CPS/HVS): the US homeownership rate was 65.8% in 2022, up from 64.6% in 2019 and a low of 63.4% in 2016 (after the 2004 foreclosure crisis and 2008 Great Recession); the rebound was driven largely by householders 44 and younger. By region in 2022: Midwest 70% (highest), South 67.3%, Northeast 62.5%, West 61.4%. By race/ethnicity in 2022: non-Hispanic white 74.4% (71.9% in 2016); Asian, Native Hawaiian, or Other Pacific Islander 61.0%; American Indian/Alaska Native 53.4%; Black alone 45%. Homeownership is a major driver of net worth.',
+        ex: [
+          'Under-35 householders have the LOWEST homeownership rate, yet rates among them rose the most (up 2.2 points from 2016 to 2019) — so the article’s title is about change, not level.',
+          'Low mortgage rates likely helped drive the rise in all regions, even after rates began going up in 2022.',
+          'Rates among older householders stayed stable from 2016 to 2022.',
+          'Race: increases from 2016 to 2022 were not significantly different across groups; levels still differ widely.'
+        ],
+        src: '“Younger Householders Drove Rebound in U.S. Homeownership” (Census); Homeownership Variation slides Q4–Q6.'
+      },
+      qs: [
+        mc('In the Census article, the 2022 homeownership rate for Black alone householders was about:', '45%', ['61%', '53%', '74%'], ''),
+        mc('What likely fueled the increase in homeownership in all regions?', 'Low mortgage rates', ['Rapidly rising mortgage rates', 'A sharp drop in the number of young householders', 'New restrictions on mortgage lending'], 'Class question 5.'),
+        mc('“Less than 35” has the lowest homeownership rate by age. Is the article title “Younger Householders Drove Rebound” wrong?', 'No — the title is about the change in rates; under-35 rates rose among the most even though their level remains lowest', ['Yes, because under-35 rates fell', 'Yes, because older householders drove the rebound', 'No, because under-35 have the highest rates'], ''),
+        ex('DESCRIBE the main points of the Census homeownership article: rates by age, region, and race/ethnicity.', [
+          'Overall 65.8% (2022) vs 64.6% (2019) vs low 63.4% (2016); rebound led by householders 44 and under',
+          'Under 35 lowest level but rose most; older groups stable',
+          'Region 2022: Midwest 70% highest, South 67.3%, Northeast 62.5%, West 61.4%; low mortgage rates likely helped',
+          'Race: white 74.4%, Asian/NHPI 61.0%, AIAN 53.4%, Black 45%'
+        ])
+      ]
+    },
+    {
+      id: 'G2', name: 'Redlining, Covenants & Urban Renewal', price: 320,
+      deed: {
+        def: 'REDLINING = denying mortgages or insurance to neighborhoods based on assessed “risk.” In the 1930s the Home Owners’ Loan Corporation (HOLC) graded neighborhoods A–D (green, blue, yellow, red) using racial composition; majority-Black neighborhoods were graded D (“redlined”), and FHA/VA lending followed those maps through the 1960s. RACIALLY RESTRICTIVE COVENANTS = deed clauses barring sale or occupancy by people of certain races. URBAN RENEWAL = mid-century federally supported redevelopment that cleared and rebuilt urban neighborhoods, often displacing Black communities. The Fair Housing Act (1968) outlawed redlining, yet wealth gaps persist.',
+        ex: [
+          'New Deal: HOLC (1933) refinanced about 1 million foreclosed mortgages; FHA (1934) insured mortgages with 20% or less down and 20–30 year terms; VA mortgage guarantee (1944) let veterans buy with no down payment.',
+          'By the end of the 1950s, 98% of FHA-insured loans went to white households; US homeownership rose from 44% (1940) to 62% (1960).',
+          'Excluded Black buyers were pushed toward predatory contract leasing / rent-to-own with inflated costs and balloon payments.',
+          'Government agencies + private businesses (lenders, appraisers, agents) worked together to decide who got mortgages, producing segregated communities and unequal resources.',
+          'Video: Race: The Power of an Illusion; Richmond Digital Scholarship Lab redlining maps (class link).'
+        ],
+        src: 'Homeownership by Race slides; Rucks-Ahidiana, “Housing as Capital” (SOH Ch. 1). Covenant and urban-renewal definitions are standard ones — the chapter pages provided did not cover them, so check your notes.'
+      },
+      qs: [
+        mc('Redlining refers to:', 'Denying mortgages or insurance to neighborhoods — especially majority-Black ones — based on assessed risk maps', ['Painting houses in a uniform color', 'A program giving cheap loans to Black families', 'Rezoning farmland for new suburbs'], ''),
+        mc('Which New Deal-era agency graded neighborhoods A–D by “risk” (with majority-Black areas graded D)?', 'The Home Owners’ Loan Corporation (HOLC)', ['The Census Bureau', 'The Federal Land Bank system (1916)', 'The VA mortgage guarantee program (1944)'], ''),
+        mc('The Fair Housing Act outlawed redlining in 1968. Which explanation best accounts for persisting racial housing and wealth gaps?', 'Advantages built under earlier exclusion were passed down — through inheritance, ownership rates, and home values', ['The Act was never enforced in any form', 'Black families chose not to buy homes', 'Homes appreciate equally in all neighborhoods'], ''),
+        ex('Name and describe historical forces in housing (e.g., redlining, racially restrictive covenants, urban renewal) that contributed to racial wealth gaps. How did government agencies and private businesses work together?', [
+          'Redlining: HOLC A–D maps; FHA/VA followed them; majority-Black neighborhoods denied credit',
+          'Racially restrictive covenants barred sales to certain buyers; urban renewal displaced communities',
+          'FHA/VA made mortgages cheap for whites (98% of FHA loans to whites by the 1950s)',
+          'Private lenders, appraisers, and agents reinforced segregation',
+          'Fair Housing Act 1968 ended redlining, but the wealth effects persist'
+        ])
+      ]
+    },
+    {
+      id: 'G3', name: 'The Black–White Wealth Gap', price: 350,
+      deed: {
+        def: 'WEALTH = assets less liabilities (own less owe). 2022 median family wealth by race/ethnicity (CBO figure on the slide): White $674.1K; Asian and other $362.4K; Black $244.0K; Hispanic $231.7K. Rucks-Ahidiana (“Housing as Capital”): housing is not only neighborhood access but CAPITAL. Three mechanisms behind current Black–white wealth gaps, across income categories: (1) INHERITANCE, (2) HOMEOWNERSHIP RATES, (3) HOME VALUES.',
+        ex: [
+          'Inheritance: 26% of white vs. 8% of Black households received one (average $66,706 vs. $10,902).',
+          'Homeownership rates: 68% of white vs. 42% of Black households.',
+          'Home values: average $336,997 for white vs. $181,595 for Black homeowners; segregation, disinvestment, and steering contribute.',
+          'Homes are 76% of white homeowners’ assets and 89% of Black homeowners’ assets; 75% of Black wealth is in home values.',
+          'In 1962 whites held almost 7 times Black wealth; the gap in 2016 was about the same (“a dime for every dollar”).'
+        ],
+        src: 'Homeownership by Race slides (CBO figure); SOH Ch. 1 — Rucks-Ahidiana (2016 Survey of Consumer Finances). Units on the CBO slide are as shown ($ thousands); verify against the slide.'
+      },
+      qs: [
+        mc('Which group had the highest 2022 median family wealth on the CBO slide?', 'White', ['Asian and other', 'Black', 'Hispanic'], ''),
+        mc('Which is NOT one of the three mechanisms in “Housing as Capital”?', 'Differences in the college majors people choose', ['Inheritance', 'Homeownership rates', 'Home values'], ''),
+        mc('Two families earn the same income. One receives a family gift for a down payment and buys a home that appreciates; the other cannot. Which mechanisms are at work?', 'Inheritance/family wealth and homeownership rates (leading to different home values)', ['Only differences in personal budgeting skill', 'Only differences in college majors', 'None — income alone determines wealth'], ''),
+        ex('DESCRIBE two forces that have impacted Black–white wealth gaps.', [
+          'Name two: e.g., redlining/FHA exclusion, inheritance, homeownership rates, home values',
+          'Describe how each works (e.g., early white access to FHA loans; inheritance passes advantage)',
+          'Support with evidence/numbers (26% vs 8% inheritance; 68% vs 42% homeownership; $336,997 vs $181,595)',
+          'Show the gaps persist across income levels'
+        ])
+      ]
+    }
+  ]
+};
+
+// ---- Community Chest: true/false lightning cards ----
+const CHEST = [
+  { s: 'Housing treated as a commodity is valued mainly for its exchange value.', t: true },
+  { s: 'The mortgage interest deduction is an example of treating housing as a right.', t: false, why: 'It promotes housing as a commodity/investment.' },
+  { s: 'A community land trust is an example of decommodification.', t: true },
+  { s: 'Kairos refers to the need or reason for a piece of communication.', t: false, why: 'That is exigence; kairos is “lucky timing.”' },
+  { s: 'Mythos can be understood as a shared sense of how the world works.', t: true },
+  { s: 'Procedural rhetoric is limited to video games.', t: false, why: 'It is not exclusive to games or video games.' },
+  { s: 'Ian Bogost coined “procedural rhetoric” in Persuasive Games (2007).', t: true },
+  { s: 'In Mario Kart 8, players in first place get the strongest items.', t: false, why: 'The catch-up design gives trailing players more power-ups.' },
+  { s: 'The Landlord’s Game had an intentionally educational goal.', t: true },
+  { s: 'A Gini coefficient of 1 means perfect equality.', t: false, why: '0 = perfect equality; 1 = greatest inequality.' },
+  { s: 'Wealth is assets minus liabilities.', t: true },
+  { s: 'In the class Monopoly activity, the Wheelbarrow started with the most cash.', t: false, why: 'The Hat did ($3,915); the Wheelbarrow had $232.' },
+  { s: 'Wealth is distributed more unequally than income in the US.', t: true },
+  { s: 'Gordon argues that US inequality is mostly an accident of market forces.', t: false, why: 'He argues it is purposeful — produced by policy.' },
+  { s: 'The Fair Housing Act of 1968 outlawed redlining.', t: true },
+  { s: 'Under-35 householders have the highest homeownership rate by age.', t: false, why: 'They have the lowest, though their rate rose the most.' },
+  { s: 'In the SOH chapter, white households were more likely than Black households to receive an inheritance (26% vs. 8%).', t: true },
+  { s: 'Primary sources summarize and interpret secondary sources.', t: false, why: 'It is the reverse: secondary sources interpret primary sources.' },
+  { s: 'Mills distinguishes personal troubles of milieu from public issues of social structure.', t: true },
+  { s: 'The American Dream’s ethos appeal credits personal qualities for success or failure.', t: true },
+  { s: 'The Great Gatsby is an example of a rags-to-riches celebration with no critique.', t: false, why: 'It is a critique of the Dream.' },
+  { s: 'Spatial rhetoric includes analysis of accessibility in physical spaces.', t: true },
+  { s: 'HOLC maps graded majority-Black neighborhoods A (green).', t: false, why: 'They were graded D (red) — “redlined.”' },
+  { s: 'Ozaki found Japanese housing emphasized familial privacy and flexible multi-use spaces.', t: true },
+  { s: 'Intergenerational mobility is about how family origin predicts where children land.', t: true },
+  { s: 'The 2022 US homeownership rate was lower than in 2019.', t: false, why: 'It was higher: 65.8% vs. 64.6%.' }
+];
+
+// ---- Essay prompts (the 8 possible midterm prompts) with key points ----
+const ESSAYS = [
+  { id: 1, topic: 'Procedural rhetoric', prompt: 'DEFINE and DESCRIBE procedural rhetoric. Provide at least three examples from lecture or pre-class assignments to show your understanding. No more than two examples may be video games.',
+    key: ['Definition: processes/procedures used for persuasive or expressive purposes (making claims through rules and mechanics)', 'Coined by Ian Bogost, Persuasive Games (2007); not exclusive to games', 'Example: Mario Kart 8 — trailing players get stronger items (those behind deserve more help)', 'Example: Overcooked 2 — succeed by communicating efficiently', 'Third example NOT a video game: Monopoly / The Landlord’s Game / in-class Monopoly activity (explain the argument its procedures make)'] },
+  { id: 2, topic: 'Spatial rhetoric', prompt: 'DEFINE and DESCRIBE spatial rhetoric. Provide at least two examples from lecture, pre-class assignments, or our UNC Charlotte campus to show your understanding.',
+    key: ['Definition: physical spaces/places as communicative; arrangement of objects in space; accessibility', 'Example 1: classroom tables seating four and facing each other signal group discussion', 'Example 2: a UNC Charlotte campus space (or Ozaki’s English vs. Japanese home layouts)', 'Explain the message sent and to whom (audience/purpose)'] },
+  { id: 3, topic: 'Landlord’s Game → Monopoly', prompt: 'EXPLAIN the evolution of Monopoly from The Landlord’s Game, with a focus on procedural rhetoric. In your response, (1) name the creator(s), (2) describe one significant similarity between the two games, and (3) describe one significant difference between the two games.',
+    key: ['Creator: Lizzie Magie (Landlord’s Game); mention who popularized Monopoly if covered in lecture', 'Similarity: board circuit, buying properties, collecting rent, salary', 'Difference: educational critique of monopoly vs. appeal of competitive monopoly play', 'Procedural rhetoric: what the rules argue in each (and why the popular version won out)'] },
+  { id: 4, topic: 'TV-show analysis & methods', prompt: 'Recall our in-class activity analyzing television shows (and the debrief about that activity). DESCRIBE the best research methods as well as the types of sources you would need to consult if you planned to continue that analysis.',
+    key: ['Primary source: watch the show → textual/content analysis', 'Quantitative: gather performer demographics through research/surveys (racial/ethnic identity was a quantitative measure)', 'Qualitative: interview performers or study interviews; talk to fans/viewers', 'Source types: primary vs. secondary vs. tertiary; first attempt relied on secondary/tertiary', 'Limits of the first attempt: one episode, little time, few conclusions'] },
+  { id: 5, topic: 'Sociology', prompt: 'DESCRIBE “sociology.” EXPLAIN what the discipline of sociology is tasked to contribute to what is known about our social world. Provide an EXAMPLE of how sociological interest in a social phenomenon [to be announced, if included, in exam] differs from another discipline’s interest. Be thorough in your description, explanation, and example.',
+    key: ['Sociology: systematic study of society, social behavior, and social forces/institutions/structure', 'Contribution: sociological imagination — connects biography and history, private troubles and public issues', 'Asks who benefits and who suffers; questions “natural” assumptions; looks for patterns across groups, places, time', 'Disciplinary perspective = lens with its own concepts', 'Example contrast (e.g., obesity): other discipline looks at individual body/choices; sociology looks at patterns by time, place, age, race, social conditions'] },
+  { id: 6, topic: 'Exceptional, purposeful, consequential', prompt: 'DESCRIBE what it means to say that social stratification in the US is exceptional, purposeful, and consequential. In addition to describing all three characteristics of social stratification in the US, include an EXAMPLE for each characteristic.',
+    key: ['Exceptional — more unequal than ever and than peer democracies; example: Gini ranking vs. OECD peers', 'Purposeful — result of policy meant to redistribute upward; example: dismantling New Deal, tax cuts, deregulation, Powell memo', 'Consequential — harms the left-behind and the economy/democracy; example: health, incarceration, weakened consumption/democracy', 'One concrete example for EACH of the three'] },
+  { id: 7, topic: 'Commodity vs. right', prompt: 'EXPLAIN what it means from a sociological perspective to view housing as a commodity versus a right. In your explanation, DESCRIBE a previously published research study for each.',
+    key: ['Commodity: housing valued by exchange in a market (investment, mortgages, appraisal); market socially created', 'Commodity study: e.g., Flippen 2004, Jackson 1985, Stuart 2003, Gotham 2002 (name and what it found)', 'Right: housing as an entitlement to decent affordable shelter regardless of ability to pay; decommodification', 'Right study: e.g., tenant activism (Small, Williams, Arena, Pattillo 2007) or Bratt et al. 2006; Desmond 2012', 'Optional: Pattillo says the dichotomy is overly stylized — real policy mixes both'] },
+  { id: 8, topic: 'Black–white wealth gaps', prompt: 'DESCRIBE two forces that have impacted Black–white WEALTH gaps.',
+    key: ['Define wealth: assets less liabilities', 'Force 1 (e.g., redlining/FHA/VA exclusion; covenants; urban renewal) with how it worked', 'Force 2 (e.g., inheritance, homeownership rates, or home values) with how it worked', 'Evidence: 26% vs 8% inheritance; 68% vs 42% ownership; $336,997 vs $181,595 home value; 98% of FHA loans to whites', 'Why gaps persist after the Fair Housing Act (1968)'] }
+];
+
+const DISTRICTS = [D_A, D_B, D_C, D_D, D_E, D_F, D_G];
+(function(){
+'use strict';
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const shuffle = a => { a = a.slice(); for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const reduce = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const money = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+
+/* ---------- data lookups ---------- */
+const PROPS = {};
+DISTRICTS.forEach(d => d.props.forEach(p => { PROPS[p.id] = { p, d }; }));
+const ALL_IDS = Object.keys(PROPS);
+const LAYOUT = ['GO','A1','A2','A3','CH','B1','B2','B3','JAIL','C1','C2','C3','CC','D1','D2','D3','PARK','E1','E2','E3','CH','F1','F2','F3','GOTO','G1','CC','G2','CH','G3','CC','CH'];
+function gridPos(i){
+  if (i <= 8) return [9, 9 - i];
+  if (i <= 16) return [9 - (i - 8), 1];
+  if (i <= 24) return [1, 1 + (i - 16)];
+  return [1 + (i - 24), 9];
+}
+const ESSAY_DEEDS = {1:['E1'],2:['B3','D1'],3:['E2'],4:['E3'],5:['A1','A2','A3'],6:['F3','F1'],7:['C1','C2','C3'],8:['G2','G3']};
+const TIER = ['Deed question','House question','Hotel question (explain)','Mastery review'];
+
+/* ---------- storage ---------- */
+const KEY = 'pricePlace.v1';
+let store = { game: null, essays: {}, drafts: {}, mockBest: null };
+try { const raw = localStorage.getItem(KEY); if (raw) store = Object.assign(store, JSON.parse(raw)); } catch(e){}
+function save(){ try { store.game = G; localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){} }
+
+/* ---------- game state ---------- */
+let G = newGame(8);
+if (store.game && !store.game.over && store.game.started) G = store.game;
+let busy = false, selected = null, forced = false;
+function newGame(laps){
+  return { started:false, over:false, laps, lap:0, pos:0, cash:1500, turn:0, lvl:{}, asked:{}, correct:{}, missed:[], passes:2, setBonus:{}, log:[], right:0, wrong:0, dice:[0,0], final:false };
+}
+const lvlOf = id => G.lvl[id] || 0;
+const worth = () => G.cash + ALL_IDS.reduce((s,id) => s + PROPS[id].p.price * lvlOf(id), 0);
+const mastery = () => ALL_IDS.reduce((s,id) => s + lvlOf(id), 0) / (ALL_IDS.length * 3);
+function addCash(n){ G.cash = Math.max(0, G.cash + n); }
+function log(msg, cls){ G.log.unshift({ msg, cls: cls||'' }); G.log = G.log.slice(0, 40); }
+function distRent(d){
+  const full = d.props.every(p => lvlOf(p.id) >= 1);
+  const base = d.props.reduce((s,p) => s + lvlOf(p.id) * Math.round(p.price / 10), 0);
+  return { base, full, total: full ? base * 2 : base };
+}
+function totalRent(){ return DISTRICTS.reduce((s,d) => s + distRent(d).total, 0); }
+
+/* ---------- rendering ---------- */
+function pips(id){
+  const l = lvlOf(id);
+  return '<span class="pips" aria-hidden="true">' + [1,2,3].map(n => '<i class="' + (l >= n ? 'on' : '') + (l >= 3 && n === 3 ? ' h' : '') + '"></i>').join('') + '</span>';
+}
+function renderBoard(){
+  const b = $('#board');
+  let html = '';
+  LAYOUT.forEach((t, i) => {
+    const [r, c] = gridPos(i);
+    const style = 'grid-row:' + r + ';grid-column:' + c + ';';
+    const here = G.pos === i ? ' here' : '';
+    const sel = selected === i ? ' sel' : '';
+    const tok = G.pos === i ? '<span class="tok" aria-hidden="true"></span>' : '';
+    if (PROPS[t]) {
+      const { p, d } = PROPS[t];
+      html += '<button class="cell' + here + sel + '" data-i="' + i + '" style="' + style + '--c:' + d.color + '" aria-label="' + esc(p.id + ' ' + p.name + ', level ' + lvlOf(t) + ' of 3') + '"><span class="band"></span><span class="id">' + p.id + '</span><span class="nm">' + esc(p.name) + '</span>' + pips(t) + tok + '</button>';
+    } else {
+      const lab = { GO:['Go','+$200 + rent','GO'], JAIL:['Review Jail','just visiting','JAIL'], PARK:['Study Break','free fact +$50','FREE'], GOTO:['Go to Review','retry a miss','&rarr;JAIL'], CH:['Chance','essay prompt','?'], CC:['Chest','true / false','T/F'] }[t];
+      const cls = ['GO','JAIL','PARK','GOTO'].includes(t) ? 'corner' : 'special';
+      html += '<button class="cell ' + cls + here + sel + '" data-i="' + i + '" style="' + style + '" aria-label="' + lab[0] + '">' + '<span class="full">' + lab[0] + '<small>' + lab[1] + '</small></span><span class="ab">' + lab[2] + '</span>' + tok + '</button>';
+    }
+  });
+  html += '<div class="center" id="center"></div>';
+  b.innerHTML = html;
+  renderCenter();
+}
+function renderCenter(){
+  const c = $('#center'); if (!c) return;
+  if (!G.started || G.over) {
+    c.innerHTML = '<h2>Price of Place</h2><p>Own every deed on the board. Land on a square, answer the question, and build from a Deed to a House to a Hotel.</p>' +
+      '<div class="seg" role="group" aria-label="Game length" id="lenseg">' + [[4,'Quick · 4 laps'],[8,'Standard · 8 laps'],[15,'Marathon · 15 laps']].map(x => '<button aria-pressed="' + (G.laps === x[0]) + '" data-laps="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>' +
+      '<div class="row"><button class="btn primary" id="startBtn">' + (G.over ? 'Play again' : 'Start game') + '</button></div>' +
+      '<p class="hint">Start with $1,500 and 2 Transfer Passes.</p>';
+    return;
+  }
+  c.innerHTML = '<div class="dice" aria-live="polite"><div class="die" id="d1">' + (G.dice[0] || '?') + '</div><div class="die" id="d2">' + (G.dice[1] || '?') + '</div></div>' +
+    '<div class="row"><button class="btn primary" id="rollBtn"' + (busy ? ' disabled' : '') + '>Roll dice</button><button class="btn" id="passBtn"' + (busy || !G.passes ? ' disabled' : '') + '>Transfer Pass (' + G.passes + ')</button></div>' +
+    '<p>Lap ' + Math.min(G.lap + 1, G.laps) + ' of ' + G.laps + ' &middot; turn ' + (G.turn + 1) + '</p>' +
+    '<div class="row"><button class="btn small" id="endBtn"' + (busy ? ' disabled' : '') + '>End game</button></div>';
+}
+function renderHud(){
+  $('#hud').innerHTML = [
+    ['Cash', '<b class="' + (G.cash === 0 ? 'neg' : '') + '">' + money(G.cash) + '</b>'],
+    ['Net worth', '<b>' + money(worth()) + '</b>'],
+    ['Mastery', '<b>' + Math.round(mastery() * 100) + '%</b>'],
+    ['Accuracy', '<b>' + (G.right + G.wrong ? Math.round(100 * G.right / (G.right + G.wrong)) + '%' : '–') + '</b>']
+  ].map(x => '<div class="stat">' + x[1] + '<span>' + x[0] + '</span></div>').join('');
+}
+function deedHTML(id, opts){
+  const { p, d } = PROPS[id]; opts = opts || {};
+  return '<div class="deed" style="--c:' + d.color + '"><div class="dh"><small>Title deed · ' + esc(d.name) + '</small><b>' + esc(p.name) + '</b></div><div class="db">' +
+    '<h4>Definition</h4><p>' + esc(p.deed.def) + '</p><h4>Examples &amp; evidence</h4><ul>' + p.deed.ex.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>' +
+    '<div class="src">Source: ' + esc(p.deed.src) + '</div></div></div>';
+}
+function renderSide(){
+  const idx = selected != null ? selected : G.pos;
+  const t = LAYOUT[idx];
+  const dc = $('#deedcard');
+  if (busy && selected == null && G.started && !G.over) {
+    dc.innerHTML = '<h3>Current square</h3><p style="margin:0">A question is in play. The deed card appears here as soon as you answer.</p>';
+  } else if (PROPS[t]) {
+    const lv = lvlOf(t);
+    dc.innerHTML = '<h3>' + (selected != null ? 'Selected square' : 'Current square') + '</h3>' + deedHTML(t) +
+      '<p class="hint" style="margin:8px 0 0">Level ' + lv + ' of 3 · ' + ['not owned','deed owned','house built','hotel built'][lv] + ' · value ' + money(PROPS[t].p.price) + '</p>';
+  } else {
+    const info = { GO:'Collect $200 plus rent from every deed you own each time you pass Go. Owning all three deeds in a district doubles that district’s rent.', JAIL:'Just visiting. You may re-try a question you missed, for +$50.', PARK:'Study break: read a random deed fact and collect $50.', GOTO:'Sent to Review Jail. Re-answer a question you missed to leave (+$50).', CH:'Chance: a possible midterm essay prompt. Write or outline an answer, then tick each key point you covered (+$40 each).', CC:'Community Chest: one true/false card. +$75 if right, -$25 if wrong.' }[t];
+    dc.innerHTML = '<h3>' + (selected != null ? 'Selected square' : 'Current square') + '</h3><p style="margin:0">' + info + '</p>';
+  }
+  $('#mastery').innerHTML = DISTRICTS.map(d => {
+    const bars = d.props.map(p => { const l = lvlOf(p.id); return '<b class="' + (l ? 'on' : '') + (l === 3 ? ' h' : '') + '" title="' + esc(p.id + ' level ' + l) + '"></b>'; }).join('');
+    const done = d.props.reduce((s,p) => s + lvlOf(p.id), 0);
+    return '<div class="mrow" style="--c:' + d.color + '"><i></i><span>' + esc(d.name) + '</span><span class="bar">' + bars + '</span></div>';
+  }).join('') + '<p class="hint" style="margin:6px 0 0">Rent due at Go: ' + money(totalRent()) + '. Each bar is one deed; red means a hotel.</p>';
+  $('#log').innerHTML = G.log.length ? G.log.slice(0, 12).map(l => '<li class="' + l.cls + '">' + esc(l.msg) + '</li>').join('') : '<li>Nothing yet. Press Start, then roll.</li>';
+}
+function renderAll(){ renderHud(); renderBoard(); renderSide(); }
+
+/* ---------- dialog ---------- */
+const dlg = $('#dlg');
+dlg.addEventListener('cancel', e => { if (forced) e.preventDefault(); });
+function openDlg(html, isForced){ forced = !!isForced; dlg.innerHTML = '<div class="dlgin">' + html + '</div>'; if (!dlg.open) dlg.showModal(); dlg.scrollTop = 0; }
+function closeDlg(){ forced = false; if (dlg.open) dlg.close(); }
+
+/* ---------- questions ---------- */
+function stakeText(s){ return 'Right: ' + s.win + ' · Wrong: ' + s.lose; }
+function ask(o){
+  // o: {id, qi, tier, stakes:{win,lose}, done(result)}  result: 'ok' | 'part' | 'miss'
+  const { p, d } = PROPS[o.id]; const q = p.qs[o.qi];
+  let peeked = false;
+  const head = '<div class="qhead" style="--c:' + d.color + '"><span class="chip">' + esc(p.id + ' · ' + p.name) + '</span><span class="tier">' + TIER[o.tier] + ' · ' + esc(stakeText(o.stakes)) + '</span></div>';
+  const peekBtn = '<div class="right-actions"><button class="btn small" id="peek">Peek at the deed (-$25)</button></div><div id="peekbox" hidden></div>';
+  function wirePeek(){
+    const pk = $('#peek'); if (!pk) return;
+    pk.onclick = () => { if (!peeked) { peeked = true; addCash(-25); renderHud(); } $('#peekbox').hidden = false; $('#peekbox').innerHTML = deedHTML(o.id); pk.disabled = true; pk.textContent = 'Deed shown (-$25)'; };
+  }
+  function feedback(kind, text){
+    const cls = kind === 'ok' ? 'good' : kind === 'part' ? 'neutral' : 'bad';
+    const head2 = kind === 'ok' ? 'Correct.' : kind === 'part' ? 'Partly there.' : 'Not quite.';
+    $('#fbres').innerHTML = '<div class="banner ' + cls + '">' + head2 + ' ' + esc(text || '') + '</div>' + (peeked ? '' : '<div style="margin-top:10px">' + deedHTML(o.id) + '</div>') + '<div class="right-actions" style="margin-top:12px"><span></span><button class="btn primary" id="cont">Continue</button></div>';
+    const pk = $('#peek'); if (pk) pk.disabled = true;
+    $('#cont').onclick = () => { closeDlg(); o.done(kind); };
+    $('#cont').focus();
+  }
+  if (q.k === 'mc') {
+    const items = shuffle([{ t:q.a, c:true }].concat(q.w.map(t => ({ t, c:false }))));
+    openDlg(head + '<h2>' + esc(q.q) + '</h2><div class="opts" role="group" aria-label="Answer choices">' + items.map((it, i) => '<button class="opt" data-i="' + i + '">' + esc(it.t) + '</button>').join('') + '</div>' + peekBtn + '<div id="fbres"></div>', true);
+    wirePeek();
+    $$('.opt', dlg).forEach(btn => btn.onclick = () => {
+      const it = items[+btn.dataset.i];
+      $$('.opt', dlg).forEach((b, i) => { b.disabled = true; if (items[i].c) b.classList.add('right'); });
+      if (!it.c) btn.classList.add('wrong');
+      feedback(it.c ? 'ok' : 'miss', q.why || (it.c ? '' : 'The correct choice is highlighted.'));
+    });
+  } else {
+    openDlg(head + '<h2>' + esc(q.q) + '</h2><label class="hint" for="ans">Write or outline your answer (optional, it is not saved), then check your key points.</label><textarea id="ans" placeholder="Type your answer here..."></textarea>' + peekBtn + '<div class="right-actions"><span></span><button class="btn primary" id="reveal">Show key points</button></div><div id="fb"></div><div id="fbres"></div>', true);
+    wirePeek();
+    $('#reveal').onclick = () => {
+      $('#reveal').disabled = true;
+      $('#fb').innerHTML = '<p style="margin:0 0 6px"><b>Tick every point your answer covered.</b></p><div class="checks">' + q.key.map((k, i) => '<label><input type="checkbox" data-k="' + i + '"><span>' + esc(k) + '</span></label>').join('') + '</div><div class="right-actions" style="margin-top:12px"><span class="hint" id="cnt">0 of ' + q.key.length + ' covered</span><button class="btn primary" id="score">Score it</button></div>';
+      $$('input[type=checkbox]', dlg).forEach(cb => cb.onchange = () => { $('#cnt').textContent = $$('input:checked', dlg).length + ' of ' + q.key.length + ' covered'; });
+      $('#score').onclick = () => {
+        const n = $$('input:checked', dlg).length, r = n / q.key.length;
+        const kind = r >= 0.75 ? 'ok' : r >= 0.5 ? 'part' : 'miss';
+        o.ratio = r;
+        $$('input', dlg).forEach(x => x.disabled = true); $('#score').disabled = true;
+        feedback(kind, n + ' of ' + q.key.length + ' key points.');
+      };
+    };
+  }
+}
+function chooseQ(id, level){
+  const p = PROPS[id].p;
+  if (level === 0) { // tier-1: least-asked of the two recall questions, prefer unanswered-correctly
+    const c = [0, 1].sort((a, b) => ((G.correct[id + ':' + a] ? 1 : 0) - (G.correct[id + ':' + b] ? 1 : 0)) || ((G.asked[id + ':' + a] || 0) - (G.asked[id + ':' + b] || 0)) || (Math.random() - .5));
+    return c[0];
+  }
+  if (level === 1) return 2;
+  if (level === 2) return 3;
+  return pick([0, 1, 2]);
+}
+function markAsked(id, qi, kind){
+  const k = id + ':' + qi;
+  G.asked[k] = (G.asked[k] || 0) + 1;
+  if (kind === 'ok') { G.correct[k] = true; G.right++; G.missed = G.missed.filter(x => x !== k); }
+  else if (kind === 'miss') { G.wrong++; if (!G.missed.includes(k)) G.missed.push(k); }
+  else { G.right++; }
+}
+function checkSets(){
+  DISTRICTS.forEach(d => {
+    if (!G.setBonus[d.id] && d.props.every(p => lvlOf(p.id) >= 1)) {
+      G.setBonus[d.id] = true; G.passes++;
+      log('Monopoly! You hold every deed in ' + d.name + '. District rent doubles and you earn a Transfer Pass.', 'good');
+    }
+  });
+}
+function landProperty(id){
+  const L = lvlOf(id), { p } = PROPS[id], qi = chooseQ(id, L);
+  const stakes = [{ win:'+$100 and the deed', lose:'-$50' }, { win:'+$150 and a house', lose:'-$25' }, { win:'+$300 and a hotel (cover 75% of key points)', lose:'-$25' }, { win:'+$25', lose:'no penalty' }][L];
+  ask({ id, qi, tier: L, stakes, done: kind => {
+    markAsked(id, qi, kind);
+    if (L === 0) { if (kind === 'ok') { G.lvl[id] = 1; addCash(100); log('Deed earned: ' + p.name + ' (+$100).', 'good'); } else { addCash(-50); log('Missed on ' + p.name + ' (-$50). It is on your review list.', 'bad'); } }
+    else if (L === 1) { if (kind === 'ok') { G.lvl[id] = 2; addCash(150); log('House built on ' + p.name + ' (+$150).', 'good'); } else { addCash(-25); log('Missed the house question on ' + p.name + ' (-$25).', 'bad'); } }
+    else if (L === 2) {
+      if (kind === 'ok') { G.lvl[id] = 3; addCash(300); log('Hotel built on ' + p.name + ' (+$300).', 'good'); }
+      else if (kind === 'part') { addCash(100); log('Partial credit on ' + p.name + ' (+$100). Land here again for the hotel.', ''); }
+      else { addCash(-25); log('Hotel answer fell short on ' + p.name + ' (-$25).', 'bad'); }
+    } else { if (kind === 'miss') log('Review slipped on ' + p.name + '. Back on your review list.', 'bad'); else { addCash(25); log('Mastery review passed on ' + p.name + ' (+$25).', 'good'); } }
+    checkSets(); endTurn();
+  } });
+}
+function landChance(){
+  const e = shuffle(ESSAYS).sort((a, b) => ((store.essays[a.id] && store.essays[a.id].best) || 0) - ((store.essays[b.id] && store.essays[b.id].best) || 0))[0];
+  const pick2 = Math.random() < .35 ? pick(ESSAYS) : e;
+  openDlg('<div class="qhead" style="--c:var(--accent)"><span class="chip">Chance · ' + esc(pick2.topic) + '</span><span class="tier">+$40 per key point covered</span></div><h2>' + esc(pick2.prompt) + '</h2><label class="hint" for="ans">Outline your answer here, then check yourself against the key points.</label><textarea id="ans">' + esc(store.drafts[pick2.id] || '') + '</textarea><div class="right-actions"><span></span><button class="btn primary" id="reveal">Show key points</button></div><div id="fb"></div>', true);
+  $('#reveal').onclick = () => {
+    store.drafts[pick2.id] = $('#ans').value; $('#reveal').disabled = true;
+    $('#fb').innerHTML = '<div class="checks">' + pick2.key.map((k, i) => '<label><input type="checkbox"><span>' + esc(k) + '</span></label>').join('') + '</div><div class="right-actions" style="margin-top:12px"><span class="hint" id="cnt">0 of ' + pick2.key.length + ' covered</span><button class="btn primary" id="collect">Collect</button></div>';
+    $$('input[type=checkbox]', dlg).forEach(cb => cb.onchange = () => { $('#cnt').textContent = $$('input:checked', dlg).length + ' of ' + pick2.key.length + ' covered'; });
+    $('#collect').onclick = () => {
+      const n = $$('input:checked', dlg).length, r = n / pick2.key.length;
+      const prev = store.essays[pick2.id] ? store.essays[pick2.id].best : 0;
+      store.essays[pick2.id] = { best: Math.max(prev, r) };
+      addCash(40 * n); G.right += n >= 3 ? 1 : 0; G.wrong += n >= 3 ? 0 : 1;
+      log('Chance essay (' + pick2.topic + '): ' + n + ' of ' + pick2.key.length + ' key points, +' + money(40 * n) + '.', n >= 3 ? 'good' : 'bad');
+      closeDlg(); endTurn();
+    };
+  };
+}
+function landChest(){
+  const c = pick(CHEST);
+  openDlg('<div class="qhead" style="--c:var(--gold)"><span class="chip">Community Chest</span><span class="tier">Right: +$75 · Wrong: -$25</span></div><h2>True or false: ' + esc(c.s) + '</h2><div class="opts" role="group"><button class="opt" data-v="1">True</button><button class="opt" data-v="0">False</button></div><div id="fb"></div>', true);
+  $$('.opt', dlg).forEach(b => b.onclick = () => {
+    const ok = (b.dataset.v === '1') === c.t;
+    $$('.opt', dlg).forEach(x => { x.disabled = true; if ((x.dataset.v === '1') === c.t) x.classList.add('right'); });
+    if (!ok) b.classList.add('wrong');
+    $('#fb').innerHTML = '<div class="banner ' + (ok ? 'good' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + ' The statement is ' + (c.t ? 'true' : 'false') + '.' + (c.why ? ' ' + esc(c.why) : '') + '</div><div class="right-actions" style="margin-top:12px"><span></span><button class="btn primary" id="cont">Continue</button></div>';
+    $('#cont').focus();
+    $('#cont').onclick = () => { addCash(ok ? 75 : -25); if (ok) G.right++; else G.wrong++; log('Community Chest: ' + (ok ? '+$75' : '-$25') + '.', ok ? 'good' : 'bad'); closeDlg(); endTurn(); };
+  });
+}
+function landPark(){
+  const id = pick(ALL_IDS), { p, d } = PROPS[id];
+  openDlg('<div class="qhead" style="--c:' + d.color + '"><span class="chip">Study Break</span><span class="tier">+$50</span></div><h2>Fact from ' + esc(p.name) + '</h2><p style="margin:0">' + esc(p.deed.def) + '</p><div class="right-actions"><span></span><button class="btn primary" id="cont">Got it (+$50)</button></div>', true);
+  $('#cont').onclick = () => { addCash(50); log('Study Break: read ' + p.name + ' (+$50).', 'good'); closeDlg(); endTurn(); };
+}
+function reviewMissed(mustDo){
+  if (!G.missed.length) {
+    openDlg('<div class="qhead" style="--c:var(--good)"><span class="chip">Review Jail</span></div><h2>Nothing to review</h2><p style="margin:0">You have no missed questions. Enjoy the $50 bonus.</p><div class="right-actions"><span></span><button class="btn primary" id="cont">Continue (+$50)</button></div>', true);
+    $('#cont').onclick = () => { addCash(50); log('Review Jail: nothing missed (+$50).', 'good'); closeDlg(); endTurn(); };
+    return;
+  }
+  const key = pick(G.missed), [id, qs] = key.split(':'), qi = +qs;
+  if (!mustDo) {
+    openDlg('<div class="qhead" style="--c:var(--ink)"><span class="chip">Review Jail</span></div><h2>' + G.missed.length + ' missed question' + (G.missed.length > 1 ? 's' : '') + ' waiting</h2><p style="margin:0">Retry one for +$50, or keep moving.</p><div class="right-actions"><button class="btn" id="skip">Skip</button><button class="btn primary" id="go">Retry one</button></div>', true);
+    $('#skip').onclick = () => { closeDlg(); endTurn(); };
+    $('#go').onclick = () => { closeDlg(); doReview(id, qi); };
+    return;
+  }
+  doReview(id, qi);
+}
+function doReview(id, qi){
+  ask({ id, qi, tier: PROPS[id].p.qs[qi].k === 'ex' ? 2 : 3, stakes: { win:'+$50', lose:'no penalty' }, done: kind => {
+    markAsked(id, qi, kind === 'part' ? 'ok' : kind);
+    if (kind !== 'miss') { addCash(50); log('Review cleared on ' + PROPS[id].p.name + ' (+$50).', 'good'); } else log('Still shaky on ' + PROPS[id].p.name + '. It stays on your review list.', 'bad');
+    endTurn();
+  } });
+}
+async function land(){
+  const t = LAYOUT[G.pos]; renderAll();
+  if (PROPS[t]) landProperty(t);
+  else if (t === 'CH') landChance();
+  else if (t === 'CC') landChest();
+  else if (t === 'PARK') landPark();
+  else if (t === 'JAIL') reviewMissed(false);
+  else if (t === 'GOTO') { log('Go to Review! Sent to Review Jail.', 'bad'); renderSide(); await sleep(reduce() ? 0 : 450); G.pos = 8; renderAll(); reviewMissed(true); }
+  else { endTurn(); } // GO
+}
+function passGo(){
+  G.lap++;
+  const rent = totalRent();
+  addCash(200 + rent);
+  log('Passed Go (lap ' + G.lap + '): +$200' + (rent ? ' + ' + money(rent) + ' rent' : '') + '.', 'good');
+  if (G.laps && G.lap >= G.laps) G.final = true;
+}
+async function move(n){
+  for (let i = 0; i < n; i++) {
+    G.pos = (G.pos + 1) % 32;
+    if (G.pos === 0) passGo();
+    renderBoard(); renderHud();
+    await sleep(reduce() ? 0 : 120);
+  }
+  land();
+}
+async function roll(){
+  if (busy) return; busy = true; selected = null; renderCenter();
+  let a = 1, b = 1;
+  const frames = reduce() ? 1 : 7;
+  for (let i = 0; i < frames; i++) { a = 1 + Math.floor(Math.random() * 6); b = 1 + Math.floor(Math.random() * 6); const d1 = $('#d1'), d2 = $('#d2'); if (d1) { d1.textContent = a; d2.textContent = b; } await sleep(55); }
+  G.dice = [a, b]; G.turn++;
+  log('Rolled ' + a + ' + ' + b + ' = ' + (a + b) + '.', '');
+  await move(a + b);
+}
+function endTurn(){
+  checkSets();
+  if (G.final) { save(); renderAll(); busy = false; finish(); return; }
+  busy = false; save(); renderAll();
+}
+function usePass(){
+  if (busy || !G.passes) return;
+  openDlg('<div class="qhead" style="--c:var(--accent)"><span class="chip">Transfer Pass</span><span class="tier">' + G.passes + ' left</span></div><h2>Move to any deed</h2><p class="hint" style="margin:0">You do not collect Go money when you transfer. Pick a weak spot.</p>' +
+    DISTRICTS.map(d => '<div><div style="font:800 12px var(--f-display);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">' + esc(d.name) + '</div><div class="row" style="justify-content:flex-start">' + d.props.map(p => '<button class="btn small" data-go="' + p.id + '">' + esc(p.id + ' · ' + p.name) + ' (L' + lvlOf(p.id) + ')</button>').join('') + '</div></div>').join('') +
+    '<div class="right-actions"><span></span><button class="btn" id="cancel">Cancel</button></div>', false);
+  $('#cancel').onclick = closeDlg;
+  $$('[data-go]', dlg).forEach(b => b.onclick = () => { G.passes--; G.pos = LAYOUT.indexOf(b.dataset.go); busy = true; log('Transfer Pass used: moved to ' + PROPS[b.dataset.go].p.name + '.', ''); closeDlg(); land(); });
+}
+function title(m){ return m < .2 ? 'Renter' : m < .4 ? 'Homeowner' : m < .6 ? 'Landlord' : m < .85 ? 'Developer' : 'Monopolist of Place'; }
+function finish(){
+  G.over = true; save();
+  const m = mastery();
+  const weak = DISTRICTS.map(d => ({ d, s: d.props.reduce((s, p) => s + lvlOf(p.id), 0) })).sort((a, b) => a.s - b.s).slice(0, 2).filter(x => x.s < 9);
+  openDlg('<div class="qhead" style="--c:var(--accent)"><span class="chip">Game over</span><span class="tier">' + G.lap + ' laps · ' + G.turn + ' turns</span></div><div class="big">' + esc(title(m)) + '</div><p style="margin:0">Net worth <b>' + money(worth()) + '</b> (cash ' + money(G.cash) + '). Mastery <b>' + Math.round(m * 100) + '%</b>. Accuracy <b>' + (G.right + G.wrong ? Math.round(100 * G.right / (G.right + G.wrong)) : 0) + '%</b>.</p>' +
+    (weak.length ? '<p style="margin:0"><b>Study next:</b> ' + weak.map(x => esc(x.d.name)).join(' and ') + '.</p>' : '<p style="margin:0">Every district is fully developed.</p>') +
+    (G.missed.length ? '<p style="margin:0"><b>' + G.missed.length + '</b> questions are still on your review list: ' + G.missed.slice(0, 8).map(k => esc(PROPS[k.split(':')[0]].p.name)).filter((v, i, a) => a.indexOf(v) === i).join(', ') + '.</p>' : '') +
+    '<div class="right-actions"><button class="btn" id="toDeeds">Open Deed Book</button><button class="btn primary" id="again">Play again</button></div>', false);
+  $('#again').onclick = () => { closeDlg(); G = newGame(G.laps); selected = null; save(); renderAll(); };
+  $('#toDeeds').onclick = () => { closeDlg(); showTab('deeds'); };
+  renderAll();
+}
+
+/* ---------- board events ---------- */
+$('#board').addEventListener('click', e => {
+  const cell = e.target.closest('.cell'); if (cell) { selected = +cell.dataset.i; renderBoard(); renderSide(); return; }
+  if (e.target.id === 'startBtn') { const laps = G.laps; G = newGame(laps); G.started = true; log('New game. Roll to begin.', ''); selected = null; save(); renderAll(); return; }
+  if (e.target.dataset.laps) { G.laps = +e.target.dataset.laps; renderCenter(); return; }
+  if (e.target.id === 'rollBtn') roll();
+  else if (e.target.id === 'passBtn') usePass();
+  else if (e.target.id === 'endBtn') { G.final = true; finish(); }
+});
+
+/* ---------- tabs ---------- */
+function showTab(name){
+  $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  ['play', 'deeds', 'essays', 'mock'].forEach(n => { $('#pane-' + n).hidden = n !== name; });
+  if (name === 'deeds') renderDeeds();
+  if (name === 'essays') renderEssays();
+  if (name === 'mock') renderMock();
+  if (name === 'play') renderAll();
+}
+$$('nav.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+/* ---------- Deed Book ---------- */
+let deedFilter = 'ALL', deedQuery = '', deedOpen = null;
+function renderDeeds(){
+  const pane = $('#pane-deeds');
+  if (!pane.dataset.built) {
+    pane.dataset.built = '1';
+    pane.innerHTML = '<h2 class="ph">Deed Book</h2><p class="hint" style="margin:0">Every definition and example the game draws on, grouped by district. Search any term.</p><div class="tools"><input type="search" id="dq" placeholder="Search terms, names, numbers (e.g. kairos, Gini, HOLC)" aria-label="Search deeds"></div><div class="seg" id="dseg"></div><div id="dlist" style="margin-top:12px"></div>';
+    $('#dq').oninput = e => { deedQuery = e.target.value.toLowerCase(); drawDeeds(); };
+    $('#dseg').onclick = e => { if (e.target.dataset.f) { deedFilter = e.target.dataset.f; drawDeeds(); } };
+  }
+  drawDeeds();
+}
+function drawDeeds(){
+  $('#dseg').innerHTML = '<button data-f="ALL" aria-pressed="' + (deedFilter === 'ALL') + '">All</button>' + DISTRICTS.map(d => '<button data-f="' + d.id + '" aria-pressed="' + (deedFilter === d.id) + '">' + esc(d.short) + '</button>').join('');
+  const q = deedQuery;
+  $('#dq').value = deedQuery;
+  let n = 0;
+  $('#dlist').innerHTML = DISTRICTS.filter(d => deedFilter === 'ALL' || d.id === deedFilter).map(d => d.props.filter(p => {
+    if (!q) return true;
+    return (p.id + ' ' + p.name + ' ' + p.deed.def + ' ' + p.deed.ex.join(' ') + ' ' + p.deed.src).toLowerCase().includes(q);
+  }).map(p => { n++; return '<details class="dd" style="--c:' + d.color + '"' + (deedOpen === p.id || (q && n <= 3) ? ' open' : '') + '><summary><b>' + esc(p.id + ' · ' + p.name) + '</b><span class="dn">' + esc(d.name) + '</span>' + pips(p.id) + '</summary>' + deedHTML(p.id) + '</details>'; }).join('')).join('') || '';
+  if (!n) $('#dlist').innerHTML = '<p class="hint">No deeds match "' + esc(q) + '".</p>';
+}
+function openDeed(id){ deedFilter = 'ALL'; deedQuery = ''; deedOpen = id; showTab('deeds'); const el = $$('#dlist details').find(x => x.open); if (el) el.scrollIntoView({ block:'start' }); }
+
+/* ---------- Essay Locker ---------- */
+let essaySel = 1;
+function renderEssays(){
+  const pane = $('#pane-essays');
+  const e = ESSAYS.find(x => x.id === essaySel);
+  pane.innerHTML = '<h2 class="ph">Essay Locker</h2><p class="hint" style="margin:0">Four of these eight prompts will be on the exam (40 points). Practice one, then check yourself against the key points. Your drafts stay in this browser.</p>' +
+    '<div class="eslist">' + ESSAYS.map(x => '<button data-e="' + x.id + '" aria-pressed="' + (x.id === essaySel) + '"><b>' + x.id + '. ' + esc(x.topic) + '</b><span>' + (store.essays[x.id] ? 'Best self-score: ' + Math.round(store.essays[x.id].best * 100) + '%' : 'Not practiced yet') + '</span></button>').join('') + '</div>' +
+    '<div class="card"><h3>Prompt ' + e.id + '</h3><p style="margin:0 0 10px;font-size:17px">' + esc(e.prompt) + '</p><label class="hint" for="essayTa">Your answer</label><textarea id="essayTa" style="min-height:180px">' + esc(store.drafts[e.id] || '') + '</textarea>' +
+    '<div class="right-actions" style="margin-top:10px"><span class="hint">Deeds to review: ' + ESSAY_DEEDS[e.id].map(id => '<button class="btn small" data-deed="' + id + '">' + id + ' ' + esc(PROPS[id].p.name) + '</button>').join(' ') + '</span><button class="btn primary" id="essayReveal">Show key points</button></div><div id="essayKeys" style="margin-top:12px"></div></div>';
+  $('.eslist', pane).onclick = ev => { const b = ev.target.closest('button'); if (b) { essaySel = +b.dataset.e; renderEssays(); } };
+  $('#essayTa').oninput = ev => { store.drafts[e.id] = ev.target.value; try { localStorage.setItem(KEY, JSON.stringify(Object.assign({}, store, { game: G }))); } catch(x){} };
+  $$('[data-deed]', pane).forEach(b => b.onclick = () => openDeed(b.dataset.deed));
+  $('#essayReveal').onclick = () => {
+    $('#essayKeys').innerHTML = '<div class="checks">' + e.key.map(k => '<label><input type="checkbox"><span>' + esc(k) + '</span></label>').join('') + '</div><div class="right-actions" style="margin-top:10px"><span class="hint" id="ecnt">0 of ' + e.key.length + ' covered</span><button class="btn" id="esave">Save self-score</button></div>';
+    $$('#essayKeys input').forEach(cb => cb.onchange = () => { $('#ecnt').textContent = $$('#essayKeys input:checked').length + ' of ' + e.key.length + ' covered'; });
+    $('#esave').onclick = () => { const r = $$('#essayKeys input:checked').length / e.key.length; store.essays[e.id] = { best: Math.max(r, (store.essays[e.id] && store.essays[e.id].best) || 0) }; save(); renderEssays(); };
+  };
+}
+
+/* ---------- Mock Midterm ---------- */
+let mock = null;
+function buildMock(){
+  const pool = {};
+  DISTRICTS.forEach(d => { pool[d.id] = []; d.props.forEach(p => p.qs.forEach((q, qi) => { if (q.k === 'mc') pool[d.id].push({ id:p.id, qi, q, dist:d.id }); })); });
+  let chosen = [], rest = [];
+  DISTRICTS.forEach(d => { const s = shuffle(pool[d.id]); chosen = chosen.concat(s.slice(0, 4)); rest = rest.concat(s.slice(4)); });
+  chosen = chosen.concat(shuffle(rest).slice(0, 2));
+  chosen = shuffle(chosen).map(x => Object.assign({ opts: shuffle([{ t:x.q.a, c:true }].concat(x.q.w.map(t => ({ t, c:false })))) }, x));
+  return { qs: chosen, essays: shuffle(ESSAYS).slice(0, 4), phase: 'mc', mcScore: 0, start: Date.now() };
+}
+function renderMock(){
+  const pane = $('#pane-mock');
+  if (!mock) {
+    pane.innerHTML = '<h2 class="ph">Mock Midterm</h2><p class="hint" style="margin:0 0 12px">Built like the real exam: 30 multiple-choice questions (60 points) and 4 of the 8 essay prompts (40 points). Questions come from every district.</p>' + (store.mockBest != null ? '<p>Best score so far: <b>' + store.mockBest + ' / 100</b></p>' : '') + '<button class="btn primary" id="mockStart">Start the exam</button>';
+    $('#mockStart').onclick = () => { mock = buildMock(); renderMock(); };
+    return;
+  }
+  if (mock.phase === 'mc') {
+    pane.innerHTML = '<h2 class="ph">Part 1 · Multiple choice</h2><p class="hint" style="margin:0 0 12px">2 points each. Answer all 30, then submit.</p>' + mock.qs.map((x, i) => '<div class="mockq" data-i="' + i + '"><div class="qn">Question ' + (i + 1) + ' of ' + mock.qs.length + '</div><p style="margin:2px 0 6px;font-weight:700">' + esc(x.q.q) + '</p>' + x.opts.map((o, j) => '<label><input type="radio" name="q' + i + '" value="' + j + '"><span>' + esc(o.t) + '</span></label>').join('') + '<div class="why hint" hidden></div></div>').join('') + '<div class="right-actions"><span class="hint" id="mcount">0 of ' + mock.qs.length + ' answered</span><button class="btn primary" id="mcSubmit">Submit part 1</button></div>';
+    pane.oninput = () => { $('#mcount') && ($('#mcount').textContent = $$('#pane-mock input:checked').length + ' of ' + mock.qs.length + ' answered'); };
+    $('#mcSubmit').onclick = () => {
+      let score = 0; const weak = {};
+      mock.qs.forEach((x, i) => {
+        const sel = $('input[name="q' + i + '"]:checked'); const box = $('.mockq[data-i="' + i + '"]');
+        const ok = sel && x.opts[+sel.value].c;
+        if (ok) score++; else weak[x.id] = true;
+        box.classList.add(ok ? 'ok' : 'no');
+        $$('input', box).forEach(r => r.disabled = true);
+        const w = $('.why', box); w.hidden = false; w.innerHTML = (ok ? 'Correct.' : 'Answer: <b>' + esc(x.q.a) + '</b>') + ' <em>(' + esc(PROPS[x.id].p.name) + ')</em>';
+      });
+      mock.mcScore = score; mock.weak = Object.keys(weak);
+      $('#mcSubmit').disabled = true;
+      const next = document.createElement('div'); next.className = 'card'; next.style.marginTop = '12px';
+      next.innerHTML = '<p style="margin:0"><b>' + score + ' / ' + mock.qs.length + ' correct = ' + score * 2 + ' / 60 points.</b> ' + (mock.weak.length ? 'Review: ' + mock.weak.filter((v, i, a) => a.indexOf(v) === i).map(id => '<button class="btn small" data-deed="' + id + '">' + id + ' ' + esc(PROPS[id].p.name) + '</button>').join(' ') : 'No misses.') + '</p><div class="right-actions" style="margin-top:12px"><span></span><button class="btn primary" id="toEssays">Continue to part 2</button></div>';
+      $('#pane-mock').appendChild(next);
+      $$('[data-deed]', next).forEach(b => b.onclick = () => openDeed(b.dataset.deed));
+      $('#toEssays').onclick = () => { mock.phase = 'essay'; renderMock(); window.scrollTo(0, 0); };
+      next.scrollIntoView({ block: 'center' });
+    };
+  } else if (mock.phase === 'essay') {
+    pane.oninput = null;
+    pane.innerHTML = '<h2 class="ph">Part 2 · Short essays</h2><p class="hint" style="margin:0 0 12px">10 points each. Write each answer, then tick the key points you covered.</p>' + mock.essays.map((e, i) => '<div class="card" style="margin-bottom:12px" data-e="' + i + '"><h3>Essay ' + (i + 1) + ' · ' + esc(e.topic) + '</h3><p style="margin:0 0 8px;font-size:16px">' + esc(e.prompt) + '</p><textarea aria-label="Answer to essay ' + (i + 1) + '"></textarea><div class="checks" style="margin-top:8px" hidden>' + e.key.map(k => '<label><input type="checkbox"><span>' + esc(k) + '</span></label>').join('') + '</div><div class="right-actions" style="margin-top:8px"><span></span><button class="btn small reveal">Show key points</button></div></div>').join('') + '<div class="right-actions"><span></span><button class="btn primary" id="finishExam">Finish exam</button></div>';
+    $$('.reveal', pane).forEach(b => b.onclick = () => { b.closest('.card').querySelector('.checks').hidden = false; b.disabled = true; });
+    $('#finishExam').onclick = () => {
+      let pts = 0;
+      $$('[data-e]', pane).forEach(card => { const boxes = $$('input', card); pts += 10 * (boxes.filter(x => x.checked).length / boxes.length); });
+      pts = Math.round(pts * 2) / 2; mock.essayScore = pts; mock.phase = 'done'; mock.total = mock.mcScore * 2 + pts;
+      if (store.mockBest == null || mock.total > store.mockBest) store.mockBest = mock.total; save();
+      renderMock();
+    };
+  } else {
+    const t = mock.total, grade = t >= 90 ? 'A range' : t >= 80 ? 'B range' : t >= 70 ? 'C range' : 'Keep studying';
+    pane.innerHTML = '<h2 class="ph">Results</h2><div class="card"><div class="big">' + t + ' / 100</div><p style="margin:6px 0 0">' + grade + '. Multiple choice ' + mock.mcScore * 2 + ' / 60 · essays ' + mock.essayScore + ' / 40 (self-scored).</p>' + (mock.weak && mock.weak.length ? '<p>Deeds to revisit: ' + mock.weak.filter((v, i, a) => a.indexOf(v) === i).map(id => '<button class="btn small" data-deed="' + id + '">' + id + ' ' + esc(PROPS[id].p.name) + '</button>').join(' ') + '</p>' : '') + '<div class="row" style="justify-content:flex-start;margin-top:10px"><button class="btn primary" id="again2">Take another mock</button></div></div>';
+    $$('[data-deed]', pane).forEach(b => b.onclick = () => openDeed(b.dataset.deed));
+    $('#again2').onclick = () => { mock = null; renderMock(); };
+  }
+}
+
+/* ---------- boot ---------- */
+if (G.started && !G.over && LAYOUT[G.pos]) { /* resumed game */ }
+renderAll();
+window.__pop = { get G(){ return G; }, roll, land, PROPS, DISTRICTS, ESSAYS, CHEST, LAYOUT };
+})();
+</script></body></html>
